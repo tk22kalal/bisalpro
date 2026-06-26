@@ -1,82 +1,135 @@
-<!-- (c) adarsh-goel-->
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta property="og:image" content="https://i.ibb.co/M8S0Zzj/live-streaming.png" itemprop="thumbnailUrl">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s</title>
-    <link rel="stylesheet" type='text/css' href="https://adarsh-goel.github.io/resources/style.css">
+    <title>{{ file_name }}</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            font-family: 'Raleway', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
 
+        marquee {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            background: rgba(0,0,0,0.85);
+            padding: 12px;
+            font-family: 'Delius', serif;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 100;
+        }
+
+        .container {
+            text-align: center;
+            padding: 80px 20px 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .file-size {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .countdown-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2c5282, #1a365d);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 4px 20px rgba(44,82,130,0.4);
+        }
+
+        .countdown-number {
+            font-size: 52px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .countdown-text {
+            font-size: 15px;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .download-btn {
+            background: #2c5282;
+            color: #fff;
+            border: none;
+            padding: 14px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .download-btn:hover { background: #1a365d; }
+
+        .status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #48bb78;
+        }
+    </style>
 </head>
-
-<body class='cyber'>
-    <header>
-        <div class="toogle"></div>
-        <div id="file-name" class="cyber">
-            <marquee direction="left"> %s</marquee>
-        </div>
-    </header>
+<body>
+    <marquee direction="left">{{ file_name }}</marquee>
 
     <div class="container">
-        <a href=%s>
-            <button class="cybr-btn">
-                Download
-                <span aria-hidden>_</span>
-                <span aria-hidden class="cybr-btn__glitch">_404 Error</span>
-                <span aria-hidden class="cybr-btn__tag">_%s</span>
-            </button>
-        </a>
+        <p class="file-size">{{ file_size }}</p>
+
+        <div id="countdownBlock">
+            <div class="countdown-circle">
+                <span class="countdown-number" id="countNum">10</span>
+            </div>
+            <p class="countdown-text">Download starting in <span id="countText">10</span> seconds…</p>
+        </div>
+
+        <a id="downloadLink" class="download-btn" href="{{ file_url }}" download>Download Now</a>
+        <p class="status" id="statusMsg"></p>
     </div>
 
-    <footer>
-        <center>
-            <a href="https://github.com/biisal/biisal-file-stream-pro">
-                <h3 style="color: black; text-align: center;">FORK ME</h3>
-            </a>
-        </center>
-
-    </footer>
-
-
-    <script src="https://cdn.plyr.io/3.6.12/plyr.js"></script>
     <script>
-        const controls = [
-            'play-large',
-            'rewind',
-            'play',
-            'fast-forward',
-            'progress',
-            'current-time',
-            'duration',
-            'mute',
-            'volume',
-            'captions',
-            'settings',
-            'pip',
-            'airplay',
-            'download',
-            'fullscreen'
-        ];
-        document.addEventListener('DOMContentLoaded', () => {
-            const player = Plyr.setup('.player', { controls });
-        });
+        const fileUrl = "{{ file_url }}";
+        let seconds = 10;
+        const numEl  = document.getElementById('countNum');
+        const txtEl  = document.getElementById('countText');
+        const block  = document.getElementById('countdownBlock');
+        const status = document.getElementById('statusMsg');
 
-        const body = document.querySelector('body');
-        const title = document.querySelector('#file-name');
-        const footer = document.querySelector('footer');
-        const toogle = document.querySelector('.toogle');
-        toogle.onclick = () => {
-            body.classList.toggle('dark')
-            footer.classList.toggle('dark')
-            title.classList.toggle('dark')
-        }
+        const timer = setInterval(() => {
+            seconds--;
+            numEl.textContent = seconds;
+            txtEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                block.style.display = 'none';
+                status.textContent = '✅ Download started!';
+                window.location.href = fileUrl;
+            }
+        }, 1000);
     </script>
 </body>
-
 </html>
