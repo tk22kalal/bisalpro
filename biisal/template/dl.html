@@ -2,134 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ file_name }}</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
+    <title>Download - {{ file_name }}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-            font-family: 'Raleway', sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-        }
-
-        marquee {
-            font-size: 18px;
-            font-weight: 600;
-            color: #fff;
-            background: rgba(0,0,0,0.85);
-            padding: 12px;
-            font-family: 'Delius', serif;
-            width: 100%;
-            position: fixed;
-            top: 0;
-            z-index: 100;
-        }
-
-        .container {
-            text-align: center;
-            padding: 80px 20px 40px;
-            max-width: 500px;
-            width: 100%;
-        }
-
-        .file-size {
-            font-size: 14px;
-            color: #aaa;
-            margin-bottom: 30px;
-        }
-
-        .countdown-circle {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2c5282, #1a365d);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            box-shadow: 0 4px 20px rgba(44,82,130,0.4);
-        }
-
-        .countdown-number {
-            font-size: 52px;
-            font-weight: bold;
-            color: #fff;
-        }
-
-        .countdown-text {
-            font-size: 15px;
-            color: #aaa;
-            margin-bottom: 30px;
-        }
-
-        .download-btn {
-            background: #2c5282;
-            color: #fff;
-            border: none;
-            padding: 14px 40px;
-            font-size: 16px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.3s;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .download-btn:hover { background: #1a365d; }
-
-        .status {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #48bb78;
-        }
+        body { background: #0a0a0a; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; user-select: none; }
+        .card { background: #16213e; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 400px; }
+        .timer-circle { width: 80px; height: 80px; border: 4px solid #0f3460; border-top: 4px solid #e94560; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 20px auto; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { border-top-color: #e94560; } }
+        .btn { display: none; background: #e94560; color: #fff; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; margin-top: 10px; }
+        .file-name { font-size: 14px; color: #999; margin-bottom: 20px; word-break: break-all; }
     </style>
 </head>
-<body>
-    <marquee direction="left">{{ file_name }}</marquee>
-
-    <div class="container">
-        <p class="file-size">{{ file_size }}</p>
-
-        <div id="countdownBlock">
-            <div class="countdown-circle">
-                <span class="countdown-number" id="countNum">10</span>
-            </div>
-            <p class="countdown-text">Download starting in <span id="countText">10</span> seconds…</p>
+<body oncontextmenu="return false;">
+    <div class="card">
+        <div class="file-name">{{ file_name }}</div>
+        <div id="countdown-ui">
+            <div class="timer-circle" id="timer">10</div>
+            <p>Processing safe link...</p>
         </div>
-
-        <a id="downloadLink" class="download-btn" href="{{ file_url }}" download>Download Now</a>
-        <p class="status" id="statusMsg"></p>
+        <a id="dl-btn" href="{{ file_url }}" class="btn">Download Now</a>
     </div>
 
     <script>
-        const fileUrl = "{{ file_url }}";
-        let seconds = 10;
-        const numEl  = document.getElementById('countNum');
-        const txtEl  = document.getElementById('countText');
-        const block  = document.getElementById('countdownBlock');
-        const status = document.getElementById('statusMsg');
+        let timeLeft = 10;
+        const timerEl = document.getElementById('timer');
+        const ui = document.getElementById('countdown-ui');
+        const btn = document.getElementById('dl-btn');
 
-        const timer = setInterval(() => {
-            seconds--;
-            numEl.textContent = seconds;
-            txtEl.textContent = seconds;
-            if (seconds <= 0) {
-                clearInterval(timer);
-                block.style.display = 'none';
-                status.textContent = '✅ Download started!';
-                window.location.href = fileUrl;
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerEl.innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                ui.style.display = 'none';
+                btn.style.display = 'inline-block';
+                window.location.href = "{{ file_url }}";
             }
         }, 1000);
+        
+        // Security: Block Inspect
+        document.onkeydown = (e) => { if (e.keyCode == 123 || (e.ctrlKey && e.keyCode == 85)) return false; };
     </script>
 </body>
 </html>
