@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ file_name }}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            font-family: 'Raleway', sans-serif;
+            overflow-x: hidden;
+        }
+
+        marquee {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            font-family: 'Delius', serif;
+            width: 100%;
+            z-index: 999;
+        }
+
+        .container {
+            width: 100%;
+            background: #000;
+            position: relative;
+        }
+
+        .video-js {
+            width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9;
+        }
+
+        audio.video-js { height: 80px !important; }
+
+        .vjs-tech { object-fit: contain; }
+
+        .tap-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 60px;
+            color: rgba(255,255,255,0.95);
+            pointer-events: none;
+            z-index: 10000;
+            animation: tapFade 0.5s ease-out;
+            text-shadow: 0 3px 15px rgba(0,0,0,0.9);
+            font-weight: bold;
+        }
+
+        .tap-indicator.left  { left: 50px; }
+        .tap-indicator.right { right: 50px; }
+
+        @keyframes tapFade {
+            0%   { opacity: 1; transform: translateY(-50%) scale(0.8); }
+            50%  { transform: translateY(-50%) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-50%) scale(0.8); }
+        }
+
+        .vjs-control-bar { background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important; }
+
+        .vjs-big-play-button {
+            border-radius: 50% !important;
+            width: 2em !important; height: 2em !important;
+            line-height: 2em !important;
+            border: 0.06666em solid #fff !important;
+            background-color: rgba(43,51,63,0.7) !important;
+            left: 50% !important; top: 50% !important;
+            transform: translate(-50%, -50%) !important;
+        }
+
+        .vjs-menu-button-popup .vjs-menu { left: auto !important; right: 0 !important; }
+        .vjs-menu-button-popup .vjs-menu .vjs-menu-content { background-color: rgba(0,0,0,0.9) !important; max-height: 20em !important; }
+        .vjs-menu li.vjs-selected { background-color: rgba(255,255,255,0.2) !important; }
+        .vjs-quality-button .vjs-icon-placeholder::before { content: 'HD'; font-size: 1.5em; line-height: 1.67; }
+        .vjs-playback-rate .vjs-playback-rate-value { font-size: 1.5em; line-height: 2; }
+        a[download] { display: none !important; }
+        .vjs-control[download] { display: none !important; }
+
+        @media (max-width: 768px) {
+            marquee { font-size: 14px; padding: 8px; }
+            .tap-indicator { font-size: 48px; }
+            .tap-indicator.left  { left: 30px; }
+            .tap-indicator.right { right: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <marquee bgcolor="rgba(0,0,0,0.9)">
+            <div id="file-name">{{ file_name }}</div>
+        </marquee>
+    </header>
+
+    <div class="container">
+        <{{ tag }}
+            id="player"
+            class="video-js vjs-default-skin vjs-big-play-centered"
+            controls
+            preload="auto"
+            playsinline
+            controlsList="nodownload"
+            oncontextmenu="return false;"
+            crossorigin="anonymous">
+            <source src="{{ file_url }}" type="application/x-mpegURL">
+        </{{ tag }}>
+    </div>
+
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.12.0/dist/videojs-http-streaming.min.js"></script>
+    <script>
+    (function() {
+        'use strict';
+
+        const playerElement = document.getElementById('player');
+        const container = document.querySelector('.container');
+        const source = '{{ file_url }}';
+        const isVideo = playerElement.tagName.toLowerCase() === 'video';
+
+        let player;
+        let lastTapTime = 0, lastTapSide = null;
+        let qualityLevels;
+
+        function showTapIndicator(side, text) {
+            const el = document.createElement('div');
+            el.className = `tap-indicator ${side}`;
+            el.innerHTML = text;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 500);
+        }
+
+        function handleDoubleTap(e) {
+            if (!isVideo) return;
+            const now = Date.now();
+            const tapLen = now - lastTapTime;
+            const rect = playerElement.getBoundingClientRect();
+            const x = e.clientX || (e.touches && e.touches[0].clientX);
+            const isLeft = x < rect.left + rect.width / 2;
+
+            if (tapLen < 300 && tapLen > 0 && isLeft === lastTapSide) {
+                e.preventDefault(); e.stopPropagation();
+                if (isLeft) {
+                    player.currentTime(Math.max(0, player.currentTime() - 10));
+                    showTapIndicator('left', '⏪ 10s');
+                } else {
+                    player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
+                    showTapIndicator('right', '10s ⏩');
+                }
+            }
+            lastTapSide = isLeft;
+            lastTapTime = now;
+        }
+
+        const QualityButton = videojs.extend(videojs.getComponent('MenuButton'), {
+            constructor: function(p, o) {
+                videojs.getComponent('MenuButton').call(this, p, o);
+                this.controlText('Quality');
+                this.addClass('vjs-quality-button');
+            },
+            createEl: function() {
+                return videojs.getComponent('MenuButton').prototype.createEl.call(this, 'div', {
+                    className: 'vjs-quality-button vjs-menu-button vjs-menu-button-popup vjs-control vjs-button'
+                });
+            },
+            buildCSSClass: function() {
+                return 'vjs-quality-button ' + videojs.getComponent('MenuButton').prototype.buildCSSClass.call(this);
+            },
+            createItems: function() {
+                const items = [];
+                if (!qualityLevels || !qualityLevels.length) return items;
+                const MenuItem = videojs.getComponent('MenuItem');
+                const p = this.player();
+                items.push(new MenuItem(p, { label: 'Auto', selected: true, selectable: true }));
+                const heights = [], heightMap = {};
+                for (let i = 0; i < qualityLevels.length; i++) {
+                    const q = qualityLevels[i];
+                    if (!heights.includes(q.height)) { heights.push(q.height); heightMap[q.height] = i; }
+                }
+                heights.sort((a, b) => b - a).forEach(h => {
+                    const item = new MenuItem(p, { label: h + 'p', selected: false, selectable: true });
+                    item.on('click', function() {
+                        for (let i = 0; i < qualityLevels.length; i++)
+                            qualityLevels[i].enabled = (qualityLevels[i].height === h);
+                    });
+                    items.push(item);
+                });
+                return items;
+            }
+        });
+        videojs.registerComponent('QualityButton', QualityButton);
+
+        player = videojs('player', {
+            controls: true, autoplay: false, preload: 'auto', fluid: false,
+            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            controlBar: {
+                children: ['playToggle','currentTimeDisplay','timeDivider','durationDisplay',
+                    'progressControl','volumePanel','qualityButton','playbackRateMenuButton',
+                    'pictureInPictureToggle','fullscreenToggle']
+            },
+            html5: {
+                vhs: {
+                    overrideNative: true, enableLowInitialPlaylist: true,
+                    smoothQualityChange: true, useBandwidthFromLocalStorage: true,
+                    bandwidth: 4194304, handleManifestRedirects: true,
+                    limitRenditionByPlayerDimensions: false, useDevicePixelRatio: true
+                },
+                nativeVideoTracks: false, nativeAudioTracks: false, nativeTextTracks: false
+            }
+        });
+
+        player.ready(function() {
+            if (isVideo && source.includes('.m3u8')) {
+                qualityLevels = player.qualityLevels();
+            }
+            playerElement.addEventListener('touchstart', handleDoubleTap, { passive: true });
+            playerElement.addEventListener('click', handleDoubleTap);
+        });
+
+        player.on('error', function() {
+            const err = player.error();
+            if (err && err.code === 4) {
+                setTimeout(() => { player.src({ src: source, type: 'application/x-mpegURL' }); player.load(); }, 3000);
+            }
+        });
+
+        window.addEventListener('beforeunload', () => { if (player) player.dispose(); });
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .video-js *[download] { display: none !important; }
+            video::-webkit-media-controls-download-button { display: none !important; }
+            video::-webkit-media-controls-enclosure { overflow: hidden !important; }
+            video::-internal-media-controls-download-button { display: none !important; }
+        `;
+        document.head.appendChild(style);
+
+        playerElement.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
+        let pressTimer;
+        playerElement.addEventListener('touchstart', e => {
+            if (e.target.tagName.toLowerCase() === 'video')
+                pressTimer = setTimeout(() => { e.preventDefault(); e.stopPropagation(); }, 500);
+        });
+        playerElement.addEventListener('touchend',  () => clearTimeout(pressTimer));
+        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+    })();
+    </script>
+</body>
+</html>
+
