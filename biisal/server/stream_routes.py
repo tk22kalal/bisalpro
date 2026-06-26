@@ -414,6 +414,13 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
     file_name = file_id.file_name
     disposition = "attachment"
 
+    # Sanitize filename — strip newlines/carriage-returns and other control
+    # characters that would make aiohttp reject the Content-Disposition header.
+    if file_name:
+        file_name = re.sub(r"[\r\n\t\x00-\x1f\x7f]", "", str(file_name)).strip()
+        if not file_name:
+            file_name = None
+
     if mime_type:
         if not file_name:
             try:
