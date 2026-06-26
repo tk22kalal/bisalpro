@@ -1,234 +1,294 @@
-<!-- this code is written by @biisal tg:biisal-files  -->
-<!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.  -->
-
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BISAL FILES | {{file_name}}</title>
-    <link rel="stylesheet" href="https://unpkg.com/sheryjs/dist/Shery.css" />
-    <link rel="stylesheet" href="https://biisal.github.io/Resources/StreamCSS.css">
-    <link rel="stylesheet" href="https://biisal.github.io/Resources/playerCss.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
-        integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{ file_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            font-family: 'Raleway', sans-serif;
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .file-info {
+            background: linear-gradient(90deg, rgba(26,26,46,0.9), rgba(46,46,86,0.9));
+            padding: 15px;
+            border-radius: 12px 12px 0 0;
+            margin-bottom: -8px;
+            overflow: hidden;
+        }
+
+        .file-name-marquee {
+            font-family: 'Delius', cursive;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            animation: marquee 15s linear infinite;
+            display: inline-block;
+            padding-left: 100%;
+        }
+
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .file-info:hover .file-name-marquee { animation-play-state: paused; }
+
+        .player-wrapper {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .plyr { border-radius: 0 0 12px 12px; }
+
+        .plyr__control--overlaid {
+            background: rgba(255,255,255,0.9);
+            border: none;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            padding: 20px;
+            color: #000;
+        }
+
+        .plyr__controls {
+            background: linear-gradient(0deg, rgba(0,0,0,0.8), transparent);
+            padding: 15px;
+        }
+
+        .plyr--video .plyr__controls {
+            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+        }
+
+        .seek-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.9);
+            color: #000;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .seek-indicator.left  { left: 80px; }
+        .seek-indicator.right { right: 80px; }
+
+        .seek-indicator.show {
+            opacity: 1;
+            animation: seekPulse 0.5s ease-out;
+        }
+
+        @keyframes seekPulse {
+            0%, 100% { transform: translateY(-50%) scale(1); }
+            50%       { transform: translateY(-50%) scale(1.2); }
+        }
+
+        .loading {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s;
+        }
+
+        .loading.hidden { opacity: 0; pointer-events: none; }
+
+        .spinner {
+            width: 60px; height: 60px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .file-name-marquee { font-size: 14px; }
+            .plyr__control--overlaid { width: 60px; height: 60px; padding: 15px; }
+            .seek-indicator { font-size: 18px; padding: 10px 20px; }
+            .seek-indicator.left  { left: 40px; }
+            .seek-indicator.right { right: 40px; }
+        }
+    </style>
 </head>
-<!-- this code is written by @biisal tg:biisal-files  -->
-<!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.   -->
-
 <body>
-    <nav>
-        <div class="nleft">
-            <a href="https://t.me/bisal_files">
-                <!-- if u are trying to change the header name please remove the title text from bottom line  -->
-                <h3 id="heading" style="z-index: 100;" class="magnet title">BISAL FILES</h3>
-            </a>
+    <div class="loading" id="loading"><div class="spinner"></div></div>
+
+    <div class="container">
+        <div class="file-info">
+            <div class="file-name-marquee">{{ file_name }}</div>
         </div>
-        <div class="nryt">
-            <a class="home-btn magnet" href="#main" onclick="toggleWidthnav(this)">HOME</a>
 
-            <a href="#sec1" class="about-btn magnet" onclick="toggleWidthnav(this)">ABOUT</a>
+        <div class="player-wrapper">
+            <div class="seek-indicator left"  id="seekLeft">-10s</div>
+            <div class="seek-indicator right" id="seekRight">+10s</div>
+
+            <video id="player" controls playsinline crossorigin="anonymous"
+                controlslist="nodownload noremoteplayback"
+                disablepictureinpicture="false"
+                preload="auto"
+                oncontextmenu="return false;">
+            </video>
         </div>
-    </nav>
-    <center>
-        <div class="about-nav">
-            <a href="#sec1" class="wlcm magnet" onclick="toggleWidth(this)">WELCOME</a>
-            <a href="#sec2" class="abt-chnl magnet" onclick="toggleWidth(this)">CHANNELS</a>
-            <a href="#sec3" class="magnet bot-btn" onclick="toggleWidth(this) , bot_btn_clicked()">BOTS</a>
-            <a href="#sec4" class="magnet contact-btn" onclick="toggleWidth(this)">LET'S TALK</a>
-        </div>
-    </center>
-    <!-- this code is written by @biisal tg:biisal-files  -->
-    <!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.   -->
+    </div>
 
-    <div class="outer">
-        <div class="inner">
-            <div class="main" id="main">
-                <video id="player" class="player" src="{{file_url}}" type="video/mp4" playsinline controls
-                    width="100%"></video>
-                <div class="player"></div>
-                <div class="file-name">
-                    <h4>File name : </h4>
-                    <br>
-                    <p id="myDiv">{{file_name}}</p>
-                </div>
-                <div class="downloadBtn">
-                    <button class="magnet" onclick="vlc_player()"><img src="https://i.postimg.cc/15TQ4y7B/vlc.png"
-                            alt="">watch in VLC PLAYER</button>
-                    <button class="magnet" onclick="mx_player()"><img src="https://i.postimg.cc/sx4Msv4T/mx.png"
-                            alt="">watch in MX PLAYER</button>
-                    <button class="magnet" onclick="playit_player()"><img src="https://i.postimg.cc/RVGWYJFF/playit.png"
-                            alt="">watch in PLAYit
-                        PLAYER</button>
-                    <button class="magnet" onclick="km_player()"><img src="https://i.postimg.cc/wT9tFQ9Z/km.png"
-                            alt="">watch in KM PLAYER</button>
-                    <button class="magnet" onclick="s_player()"><img src="https://i.postimg.cc/XYJr6NGg/s.png"
-                            alt="">watch in S PLAYER</button>
-                    <button class="magnet" onclick="hd_player()"><img src="https://i.postimg.cc/rFT43LNh/hd.png"
-                            alt="">watch in HD
-                        PLAYER(4K)</button>
-                    <button class="magnet" onclick="bisalDownload()"><img style="height: 35px;"
-                            src="https://i.postimg.cc/Zncc9YLq/Pngtree-download-icon-3581467.png" alt="">download video
-                    </button>
-                </div>
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <script>
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('selectstart', e => e.preventDefault());
 
-            </div>
-            <div class="abt">
-                <div class="about">
-                    <div class="about-dets">
-                        <div class="abt-sec" id="sec1" style="padding: 160px 30px;">
-                            <h1 style="text-align: center;">WELCOME TO OUR <Span>STREAMING</Span> PAGE</h1>
-                            <p style="text-align: center; line-height: 2;word-spacing: 2px;  letter-spacing: 0.8px;">
-                                We're
-                                thrilled to have <span>you</span> here.
-                                Get ready for an
-                                amazing <span>experience</span>
-                                filled with <span>entertainment</span>, <span>fun</span>, and <span>surprises</span>.
-                                Grab
-                                your snacks, sit back, and <span>enjoy</span> the show!
-                            </p>
-                        </div>
-                        <div class="abt-sec" id="sec2">
-                            <h1>OUR ALL <span>CHANNELS</span> LIST</h1>
-                            <div class="links chnl-link">
-                                <a class="magnet" href="https://t.me/bisal_files"><button>BISAL FILES -
-                                        MAIN</button></a>
-                                <a class="magnet" href="https://t.me/movies_request_group_Fhd"><button>BISAL FILES
-                                        REQUEST GROUP</button></a>
-                                <a class="magnet" href="https://t.me/+lNMBlcpzuyg0NjI1"><button>TERABOX
-                                        LINKS</button></a>
-                                <a class="magnet" href="https://t.me/bisal_movie_request_group"><button>FILES REQ
-                                        BACKUP</button></a>
-                                <a class="magnet" href="https://t.me/+gHtA-IkBdgQ1MzA9"><button>BISAL FILES
-                                        DIRECT</button></a>
-                            </div>
-                        </div>
-                        <div class="abt-sec" id="sec3">
-                            <h1>OUR ALL <span>BOTS</span> LIST</h1>
-                            <div class="links bot-link">
-                                <a class="magnet" href="https://t.me/Pm_link_yojana_bot"><button>PM LINK
-                                        YOJANA</button></a>
-                                <a class="magnet" href="https://t.me/Ai_Auto_Filter_Bot"><button>AI FILTER
-                                        BOT</button></a>
-                                <a class="magnet" href="https://t.me/Bisal_File2Link_Bot"><button>FILE STREAM
-                                        BOT</button></a>
-                                <a class="magnet" href="https://t.me/File_RenamerV4_Bot"><button>FILE RENAMER
-                                        BOT</button></a>
-                                <a class="magnet" href="https://t.me/Wanda_Ki_Shakti_Bot"><button>WANDA KI SHAKTI
-                                        BOT</button></a>
-                                <a class="magnet" href="https://t.me/wanda_ki_shakti_2_bot"><button>WANDA KI SHAKTI 2.0
-                                        BOT</button></a>
-                            </div>
-                        </div>
-                        <div class="abt-sec" id="sec4">
-                            <!-- this code is written by @biisal tg:biisal-files  -->
-                            <!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.   -->
+        let longPressTimer;
+        document.addEventListener('touchstart', e => { longPressTimer = setTimeout(() => e.preventDefault(), 500); });
+        document.addEventListener('touchend',   () => clearTimeout(longPressTimer));
+        document.addEventListener('touchmove',  () => clearTimeout(longPressTimer));
 
-                            <p style="text-align: center;">we can tal'k for your support and you can report through
-                                telegram</p>
-                            <div class="links contact">
-                                <a href="https://t.me/biisal_bot"><button>CONTACT</button></a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <footer>
-            <div class="mid">
-                <h1 class="mid-text">VISIT <a href="#sec3" onclick="bot_btn_clicked()"><span>OUR BOTS LIST</span></a>
-                    FOR
-                    MORE
-                    INFO</h1>
-            </div>
+        const videoSource = "{{ file_url }}";
+        const isHLS = videoSource.includes('.m3u8');
 
-            <div class="last-text">
-                <p style="font-weight: 500;">
-                    Welcome to our online streaming platform! Our website allows users to generate streamable links for
-                    various files using Telegram bots. Please note that we are not responsible for the content shared or
-                    streamed through our service. Users are encouraged to respect copyright laws and adhere to our
-                    community
-                    guidelines. Enjoy easy, hassle-free file streaming.
-                </p>
-            </div>
-            <center>
-
-                <div class="movie-cont">
-                    <a href="https://t.me/+PA8OPL2Zglk3MDM1">
-                        <div class="movieSug">
-                            <div class="movieDets">
-
-                            </div>
-                            <div class="movieimg">
-                                <img src="">
-                            </div>
-                        </div>
-                    </a>
-                    <div class="low-width-movie-dets">
-                        <div class="movieStsBar">
-                            <div class="movieDets-mini">
-
-                            </div>
-                        </div>
-                    </div>
-                    <button class="ranMovBtn" onclick="getDets()">Get More Movies Suggestion</button>
-                </div>
-
-            </center>
-            <!-- this code is written by @biisal tg:biisal-files  -->
-            <!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.   -->
-
-
-            <center>
-                <div class="copyright">
-                    <h5 class="text-center">Copyright © 2023 <a href="https://t.me/bisal_files"><span
-                                style="font-weight: 700;">BISAL FILES</span></a>. All
-                        Rights Reserved.</h5>
-                    <div class="icons">
-                        <a href="https://github.com/biisal"><i class="fa-brands fa-github fa-lg"></i></a>
-                        <a href="https://t.me/bisal_Files"><i class="fa-brands fa-telegram fa-lg"></i></a>
-                        <a href="https://www.instagram.com/avisekeditx"><i
-                                class="fa-brands fa-square-instagram fa-lg"></i></a>
-                    </div>
-                    <h4 style="font-weight: 700;">This Page Is Made By <a
-                            href="https://t.me/bisal_files"><span>Bisal</span></a></h4>
-                </div>
-            </center>
-        </footer>
-</body>
-
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.155.0/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/automat/controlkit.js@master/bin/controlKit.min.js"></script>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/sheryjs/dist/Shery.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const uncopyableElement = document.querySelector(".uncopyable");
-
-        uncopyableElement.addEventListener("selectstart", function (event) {
-            event.preventDefault();
+        const player = new Plyr('#player', {
+            controls: ['play-large','rewind','play','fast-forward','progress','current-time','duration','settings','pip','fullscreen'],
+            settings: ['quality', 'speed'],
+            speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+            quality: { default: 720, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
+            ratio: '16:9',
+            fullscreen: { enabled: true, fallback: true, iosNative: true },
+            autopause: false,
+            resetOnEnd: false,
+            keyboard: { focused: true, global: true },
+            tooltips: { controls: true, seek: true }
         });
-    });
-</script>
-<script src="js/wow.min.js"></script>
-<script>
-    new WOW().init();
-</script>
-<script src="https://cdn.plyr.io/3.6.9/plyr.js"></script>
-<script src="https://biisal.github.io/Resources/StreamJs.js"></script>
-<script src="script.js"></script>
 
+        const videoElement = document.getElementById('player');
+        let errorRetryCount = 0;
+
+        function hideLoading() {
+            setTimeout(() => document.getElementById('loading').classList.add('hidden'), 500);
+        }
+
+        if (isHLS && Hls.isSupported()) {
+            const hls = new Hls({
+                enableWorker: true, backBufferLength: 90,
+                maxBufferLength: 30, maxBufferSize: 60 * 1000 * 1000,
+                manifestLoadingTimeOut: 10000, manifestLoadingMaxRetry: 3,
+                fragLoadingTimeOut: 20000, fragLoadingMaxRetry: 6
+            });
+            hls.loadSource(videoSource);
+            hls.attachMedia(videoElement);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => hideLoading());
+            hls.on(Hls.Events.ERROR, (e, data) => {
+                if (data.fatal) {
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR && errorRetryCount < 3) {
+                        errorRetryCount++; hls.startLoad();
+                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls.recoverMediaError();
+                    } else {
+                        hls.destroy();
+                    }
+                }
+            });
+            window.hls = hls;
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+            videoElement.src = videoSource;
+            videoElement.addEventListener('loadedmetadata', hideLoading);
+        } else {
+            videoElement.src = videoSource;
+            videoElement.addEventListener('loadedmetadata', hideLoading);
+        }
+
+        // Double-tap seek — click
+        let lastTapTime = 0, lastTapX = 0;
+        videoElement.addEventListener('click', function(e) {
+            const now = Date.now();
+            if (now - lastTapTime < 300 && Math.abs(e.clientX - lastTapX) < 50) {
+                const rect = videoElement.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                if (x < rect.width / 3) {
+                    player.currentTime = Math.max(0, player.currentTime - 10);
+                    showSeek('left');
+                } else if (x > rect.width * 2 / 3) {
+                    player.currentTime = Math.min(player.duration, player.currentTime + 10);
+                    showSeek('right');
+                }
+                lastTapTime = 0;
+            } else { lastTapTime = now; lastTapX = e.clientX; }
+        });
+
+        // Double-tap seek — touch
+        let lastTouchTime = 0, lastTouchX = 0;
+        videoElement.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            const touch = e.changedTouches[0];
+            if (now - lastTouchTime < 300 && Math.abs(touch.clientX - lastTouchX) < 50) {
+                const rect = videoElement.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                if (x < rect.width / 3) {
+                    player.currentTime = Math.max(0, player.currentTime - 10);
+                    showSeek('left');
+                } else if (x > rect.width * 2 / 3) {
+                    player.currentTime = Math.min(player.duration, player.currentTime + 10);
+                    showSeek('right');
+                }
+                lastTouchTime = 0;
+            } else { lastTouchTime = now; lastTouchX = touch.clientX; }
+        });
+
+        function showSeek(dir) {
+            const el = document.getElementById(dir === 'left' ? 'seekLeft' : 'seekRight');
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 500);
+        }
+
+        player.on('error', () => {
+            if (errorRetryCount < 3) {
+                errorRetryCount++;
+                setTimeout(() => { videoElement.load(); player.play(); }, 2000);
+            }
+        });
+
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) e.preventDefault();
+        });
+
+        videoElement.addEventListener('dragstart', e => e.preventDefault());
+    </script>
+</body>
 </html>
-
-<!-- this code is written by @biisal tg:biisal-files  -->
-<!-- stealing credit doesn't make you developer..so try to give full credit to the developer 😊 u will not loose anything for giving proper credit.   -->
