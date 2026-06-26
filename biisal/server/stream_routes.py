@@ -172,7 +172,7 @@ async def generate_stream_handler(request: web.Request):
         file_name = get_name(log_msg) or temp_data['file_name'] or "file"
         if isinstance(file_name, bytes):
             file_name = file_name.decode('utf-8', errors='ignore')
-        file_name = str(file_name)
+        file_name = re.sub(r"[\r\n\t\x00-\x1f\x7f]", "", str(file_name)).strip() or "file"
         file_hash = get_hash(log_msg)
 
         request_host = request.host
@@ -268,7 +268,7 @@ async def generate_download_handler(request: web.Request):
         file_name = get_name(log_msg) or temp_data['file_name'] or "file"
         if isinstance(file_name, bytes):
             file_name = file_name.decode('utf-8', errors='ignore')
-        file_name = str(file_name)
+        file_name = re.sub(r"[\r\n\t\x00-\x1f\x7f]", "", str(file_name)).strip() or "file"
         file_hash = get_hash(log_msg)
 
         request_host = request.host
@@ -302,7 +302,7 @@ async def generate_download_handler(request: web.Request):
         )
 
 
-@routes.get(r"/watch/{path:\S+}", allow_head=True)
+@routes.get(r"/watch/{path:.+}", allow_head=True)
 async def stream_handler(request: web.Request):
     try:
         path = request.match_info["path"]
@@ -326,7 +326,7 @@ async def stream_handler(request: web.Request):
         raise web.HTTPInternalServerError(text=str(e))
 
 
-@routes.get(r"/{path:\S+}", allow_head=True)
+@routes.get(r"/{path:.+}", allow_head=True)
 async def path_handler(request: web.Request):
     try:
         path = request.match_info["path"]
