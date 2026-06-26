@@ -1,0 +1,247 @@
+<!--(c) NobiDeveloper-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{file_name}} - Generate Stream</title>
+    <style>
+        body {
+            background: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .player-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .player-btn {
+            background: #2c5282;
+            color: white;
+            border: none;
+            width: 180px;
+            height: 60px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .player-btn:hover { background: #1a365d; }
+        .player-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .download-btn {
+            background: #2c5282;
+            color: white;
+            border: none;
+            width: 200px;
+            height: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover { background: #1a365d; }
+        .download-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .loading {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2c5282;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #2c5282;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+
+        @media (max-width: 480px) {
+            .player-btn  { width: 140px; height: 55px; font-size: 14px; }
+            .download-btn { width: 180px; height: 50px; font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="player-buttons">
+            <button type="button" class="player-btn" id="plyrBtn"    onclick="generateStream('plyr')"    aria-label="Stream IOS/PC">IOS/PC</button>
+            <button type="button" class="player-btn" id="videojsBtn" onclick="generateStream('videojs')" aria-label="Stream ANDROID">ANDROID</button>
+        </div>
+
+        <div>
+            <button type="button" class="download-btn" id="downloadBtn" onclick="startDownload()" aria-label="Download">DOWNLOAD</button>
+        </div>
+
+        <div class="loading">
+            <div class="spinner"></div>
+            <p class="loading-text" id="loadingText">Generating link...</p>
+        </div>
+
+        <div class="status-message" id="statusMessage"></div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const linkType  = urlParams.get('type');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (linkType === 'stream') {
+                document.getElementById('downloadBtn').style.display = 'none';
+            } else if (linkType === 'download') {
+                document.querySelector('.player-buttons').style.display = 'none';
+                startDownload();
+            }
+        });
+
+        async function generateStream(playerType, retryCount = 0) {
+            const buttons     = document.querySelectorAll('.player-btn, .download-btn');
+            const loading     = document.querySelector('.loading');
+            const statusMsg   = document.getElementById('statusMessage');
+            const loadingText = document.getElementById('loadingText');
+
+            buttons.forEach(b => b.disabled = true);
+            loading.style.display = 'block';
+            statusMsg.style.display = 'none';
+            loadingText.textContent = `Generating ${playerType === 'plyr' ? 'IOS/PC' : 'ANDROID'} stream link...${retryCount > 0 ? ` (Retry ${retryCount}/5)` : ''}`;
+
+            try {
+                const controller = new AbortController();
+                const tid = setTimeout(() => controller.abort(), 45000);
+                const response = await fetch(`/api/generate/{{token}}?player=${playerType}`, {
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                clearTimeout(tid);
+
+                const ct = response.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) throw new Error('Server returned non-JSON response. Please try again.');
+
+                const data = await response.json();
+                if (data.success) {
+                    statusMsg.className = 'status-message success';
+                    statusMsg.textContent = '✅ Stream link generated! Redirecting...';
+                    statusMsg.style.display = 'block';
+                    setTimeout(() => window.location.href = data.stream_url, 1500);
+                } else {
+                    throw new Error(data.error || 'Failed to generate stream link');
+                }
+            } catch (error) {
+                const maxRetries = 5;
+                const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+                if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
+                    statusMsg.className = 'status-message warning';
+                    statusMsg.textContent = `⏳ Retrying in ${Math.round(delay / 1000)}s... (${retryCount + 1}/${maxRetries})`;
+                    statusMsg.style.display = 'block';
+                    setTimeout(() => generateStream(playerType, retryCount + 1), delay);
+                    return;
+                }
+                statusMsg.className = 'status-message error';
+                statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message);
+                statusMsg.style.display = 'block';
+                buttons.forEach(b => b.disabled = false);
+                loading.style.display = 'none';
+            }
+        }
+
+        async function startDownload(retryCount = 0) {
+            const buttons     = document.querySelectorAll('.player-btn, .download-btn');
+            const loading     = document.querySelector('.loading');
+            const statusMsg   = document.getElementById('statusMessage');
+            const loadingText = document.getElementById('loadingText');
+
+            buttons.forEach(b => b.disabled = true);
+            loading.style.display = 'block';
+            statusMsg.style.display = 'none';
+            loadingText.textContent = `Generating download link...${retryCount > 0 ? ` (Retry ${retryCount}/5)` : ''}`;
+
+            try {
+                const controller = new AbortController();
+                const tid = setTimeout(() => controller.abort(), 45000);
+                const response = await fetch('/api/download/{{token}}', {
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                clearTimeout(tid);
+
+                const ct = response.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) throw new Error('Server returned non-JSON response. Please try again.');
+
+                const data = await response.json();
+                if (data.success) {
+                    loading.style.display = 'none';
+                    statusMsg.className = 'status-message success';
+                    statusMsg.textContent = '✅ Download starting...';
+                    statusMsg.style.display = 'block';
+                    window.location.href = data.download_url;
+                    setTimeout(() => buttons.forEach(b => b.disabled = false), 3000);
+                } else {
+                    throw new Error(data.error || 'Failed to generate download link');
+                }
+            } catch (error) {
+                const maxRetries = 5;
+                const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+                if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
+                    statusMsg.className = 'status-message warning';
+                    statusMsg.textContent = `⏳ Retrying in ${Math.round(delay / 1000)}s... (${retryCount + 1}/${maxRetries})`;
+                    statusMsg.style.display = 'block';
+                    setTimeout(() => startDownload(retryCount + 1), delay);
+                    return;
+                }
+                statusMsg.className = 'status-message error';
+                statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message);
+                statusMsg.style.display = 'block';
+                buttons.forEach(b => b.disabled = false);
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
