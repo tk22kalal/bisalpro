@@ -68,14 +68,14 @@
 
         .plyr { border-radius: 0 0 12px 12px; }
 
+        /* REMOVED: Large middle play button styling */
         .plyr__control--overlaid {
-            background: rgba(255,255,255,0.9);
-            border: none;
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            padding: 20px;
-            color: #000;
+            display: none !important;
+        }
+
+        /* REMOVED: Thumbnail/Poster display */
+        .plyr__poster {
+            display: none !important;
         }
 
         .plyr__controls {
@@ -85,35 +85,6 @@
 
         .plyr--video .plyr__controls {
             background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
-        }
-
-        .seek-indicator {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255,255,255,0.9);
-            color: #000;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-size: 24px;
-            font-weight: bold;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s;
-            z-index: 1000;
-        }
-
-        .seek-indicator.left  { left: 80px; }
-        .seek-indicator.right { right: 80px; }
-
-        .seek-indicator.show {
-            opacity: 1;
-            animation: seekPulse 0.5s ease-out;
-        }
-
-        @keyframes seekPulse {
-            0%, 100% { transform: translateY(-50%) scale(1); }
-            50%       { transform: translateY(-50%) scale(1.2); }
         }
 
         .loading {
@@ -143,10 +114,6 @@
         @media (max-width: 768px) {
             .container { padding: 10px; }
             .file-name-marquee { font-size: 14px; }
-            .plyr__control--overlaid { width: 60px; height: 60px; padding: 15px; }
-            .seek-indicator { font-size: 18px; padding: 10px 20px; }
-            .seek-indicator.left  { left: 40px; }
-            .seek-indicator.right { right: 40px; }
         }
     </style>
 </head>
@@ -159,9 +126,7 @@
         </div>
 
         <div class="player-wrapper">
-            <div class="seek-indicator left"  id="seekLeft">-10s</div>
-            <div class="seek-indicator right" id="seekRight">+10s</div>
-
+            <!-- Seek indicators HTML removed -->
             <video id="player" controls playsinline crossorigin="anonymous"
                 controlslist="nodownload noremoteplayback"
                 disablepictureinpicture="false"
@@ -185,7 +150,8 @@
         const isHLS = videoSource.includes('.m3u8');
 
         const player = new Plyr('#player', {
-            controls: ['play-large','rewind','play','fast-forward','progress','current-time','duration','settings','pip','fullscreen'],
+            // 'play-large' removed from controls to remove middle play icon
+            controls: ['rewind','play','fast-forward','progress','current-time','duration','settings','pip','fullscreen'],
             settings: ['quality', 'speed'],
             speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
             quality: { default: 720, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
@@ -226,15 +192,12 @@
                 }
             });
             window.hls = hls;
-        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-            videoElement.src = videoSource;
-            videoElement.addEventListener('loadedmetadata', hideLoading);
         } else {
             videoElement.src = videoSource;
             videoElement.addEventListener('loadedmetadata', hideLoading);
         }
 
-        // Double-tap seek — click
+        // Keep skip logic but removed visual showSeek icons
         let lastTapTime = 0, lastTapX = 0;
         videoElement.addEventListener('click', function(e) {
             const now = Date.now();
@@ -243,16 +206,13 @@
                 const x = e.clientX - rect.left;
                 if (x < rect.width / 3) {
                     player.currentTime = Math.max(0, player.currentTime - 10);
-                    showSeek('left');
                 } else if (x > rect.width * 2 / 3) {
                     player.currentTime = Math.min(player.duration, player.currentTime + 10);
-                    showSeek('right');
                 }
                 lastTapTime = 0;
             } else { lastTapTime = now; lastTapX = e.clientX; }
         });
 
-        // Double-tap seek — touch
         let lastTouchTime = 0, lastTouchX = 0;
         videoElement.addEventListener('touchend', function(e) {
             const now = Date.now();
@@ -262,20 +222,12 @@
                 const x = touch.clientX - rect.left;
                 if (x < rect.width / 3) {
                     player.currentTime = Math.max(0, player.currentTime - 10);
-                    showSeek('left');
                 } else if (x > rect.width * 2 / 3) {
                     player.currentTime = Math.min(player.duration, player.currentTime + 10);
-                    showSeek('right');
                 }
                 lastTouchTime = 0;
             } else { lastTouchTime = now; lastTouchX = touch.clientX; }
         });
-
-        function showSeek(dir) {
-            const el = document.getElementById(dir === 'left' ? 'seekLeft' : 'seekRight');
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 500);
-        }
 
         player.on('error', () => {
             if (errorRetryCount < 3) {
