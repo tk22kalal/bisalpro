@@ -178,7 +178,12 @@ class ByteStreamer:
         client = self.client
         work_loads[index] += 1
         logging.debug(f"Starting to yielding file with client {index}.")
-        media_session = await self.generate_media_session(client, file_id)
+        try:
+            media_session = await self.generate_media_session(client, file_id)
+        except AuthBytesInvalid:
+            logging.warning(f"AuthBytesInvalid for client {index}, cannot stream file.")
+            work_loads[index] -= 1
+            return
 
         current_part = 1
         location = await self.get_location(file_id)
