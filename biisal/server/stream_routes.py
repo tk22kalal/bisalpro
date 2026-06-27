@@ -364,19 +364,50 @@ async def _home_dc(index: int) -> int:
 async def media_streamer(request: web.Request, id: int, secure_hash: str):
     range_header = request.headers.get("Range", 0)
 
-    index = min(work_loads, key=work_loads.get)
-    faster_client = multi_clients[index]
+    # Build a list of client indices sorted by workload (least busy first),
+    # then try up to 3 of them if the current one times out or errors out.
+    sorted_indices = sorted(work_loads, key=work_loads.get)
+    candidates = sorted_indices[:3] if len(sorted_indices) >= 3 else sorted_indices
 
-    if Var.MULTI_CLIENT:
-        logging.info(f"Client {index} is now serving {request.remote}")
+    file_id = None
+    index = None
+    tg_connect = None
+    last_error = None
 
-    if faster_client in class_cache:
-        tg_connect = class_cache[faster_client]
-    else:
-        tg_connect = ByteStreamer(faster_client)
-        class_cache[faster_client] = tg_connect
+    for attempt, candidate_index in enumerate(candidates):
+        candidate_client = multi_clients[candidate_index]
 
-    file_id = await tg_connect.get_file_properties(id)
+        if candidate_client in class_cache:
+            streamer = class_cache[candidate_client]
+        else:
+            streamer = ByteStreamer(candidate_client)
+            class_cache[candidate_client] = streamer
+
+        try:
+            file_id = await asyncio.wait_for(
+                streamer.get_file_properties(id),
+                timeout=15
+            )
+            index = candidate_index
+            tg_connect = streamer
+            if Var.MULTI_CLIENT or attempt > 0:
+                logging.info(
+                    f"Client {index} serving {request.remote}"
+                    + (f" (retry attempt {attempt})" if attempt > 0 else "")
+                )
+            break
+        except asyncio.TimeoutError:
+            last_error = f"Client {candidate_index} timed out fetching file properties"
+            logging.warning(f"{last_error}, trying next client...")
+        except FIleNotFound:
+            raise
+        except Exception as e:
+            last_error = str(e)
+            logging.warning(f"Client {candidate_index} failed ({e}), trying next client...")
+
+    if file_id is None:
+        logging.error(f"All clients failed to fetch file properties. Last error: {last_error}")
+        raise web.HTTPServiceUnavailable(text="Stream unavailable, please try again.")
 
     if file_id.unique_id[:6] != secure_hash:
         raise InvalidHash
