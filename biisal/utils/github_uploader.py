@@ -10,7 +10,7 @@ async def upload_image_to_github(
     github_token: str,
     folder_name: str,
     title_name: str,
-    repo_owner: str = "tk22kalal",
+    repo_owner: str = "afrahtafreeh",
     repo_name: str = "thumbimages"
 ) -> str:
     try:
