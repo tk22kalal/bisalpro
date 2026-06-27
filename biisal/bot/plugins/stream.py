@@ -24,7 +24,7 @@ PROTECT_CONTENT = os.environ.get('PROTECT_CONTENT', "False") == "True"
 DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", None) == 'True'
 GIT_TOKEN = os.environ.get('GIT_TOKEN', '')
 THUMB_API = os.environ.get('THUMB_API', '')
-GITHUB_OWNER_REPO = os.environ.get('GITHUB_OWNER_REPO', 'sunday2212/webreadme4')
+GITHUB_OWNER_REPO = "sunday2212/webreadme4"
 
 MY_PASS = None
 
@@ -355,8 +355,7 @@ async def batch_command(client: Client, message: Message):
     await message.reply_text(
         "📁 Enter the destination folder path:\n\n"
         "Format: path/to/folder\n"
-        "Example: 1234xxx/marrow/anatomy\n\n"
-        "This is where JSON/HTML files will be uploaded."
+        "Example: 1234xxx/marrow/anatomy"
     )
 
 
