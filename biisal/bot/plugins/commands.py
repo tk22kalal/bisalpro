@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 from biisal.utils.human_readable import humanbytes
 from biisal.utils.database import Database
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from biisal.utils.file_properties import get_name, get_hash, get_media_file_size
 
 db = Database(Var.DATABASE_URL, Var.name)
@@ -118,7 +118,7 @@ async def root_command(bot, message):
         "Folders are expandable — click any folder to open it.\n"
         "Files are listed without the .html extension.",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📂 Open File Index", url=tree_url)
+            InlineKeyboardButton("📂 Open File Index", web_app=WebAppInfo(url=tree_url))
         ]]),
         quote=True
     )
