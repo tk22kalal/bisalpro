@@ -344,10 +344,10 @@ async def batch_command(client: Client, message: Message):
     user_id = message.from_user.id
     _batch_sessions[user_id] = {'state': 'waiting_folder', 'data': {}}
     await message.reply_text(
-        "📁 Enter the destination folder path:\n\n"
-        "Format: owner/repo/path/to/folder\n"
-        "Example: myuser/myrepo/marrow/anatomy\n\n"
-        "This is where JSON/HTML files will be uploaded."
+        f"📁 Enter the destination folder path:\n\n"
+        f"Format: path/to/folder\n"
+        f"Example: 1234xxx/marrow/anatomy\n\n"
+        f"This is where JSON/HTML files will be uploaded."
     )
 
 
@@ -362,9 +362,10 @@ async def batch_conversation_handler(client: Client, message: Message):
     if batch_session:
         if batch_session['state'] == 'waiting_folder':
             folder_path = message.text.strip()
+            github_dest_folder = f"{GITHUB_OWNER_REPO}/{folder_path}"
             _batch_sessions[user_id] = {
                 'state': 'waiting_links',
-                'data': {'github_dest_folder': folder_path}
+                'data': {'github_dest_folder': github_dest_folder}
             }
             await message.reply_text(
                 "📝 Send the links with subjects in this format:\n\n"
