@@ -6,6 +6,7 @@ import secrets
 import mimetypes
 import asyncio
 from datetime import datetime, timezone
+import aiohttp as aiohttp_client
 from aiohttp import web
 from aiohttp.http_exceptions import BadStatusLine
 from pyrogram.errors import FloodWait
@@ -445,3 +446,178 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
             "Accept-Ranges": "bytes",
         },
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# /root-tree  —  GitHub repo file index (admin use)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_ROOT_REPO   = "sunday2212/webreadme4"
+_ROOT_FOLDER = "1234xxx"
+
+
+def _build_tree(flat_items: list) -> dict:
+    """
+    Convert GitHub's flat tree list into a nested dict.
+    Only keeps .html blobs and their parent directories inside _ROOT_FOLDER.
+    Structure: { name: {'_t': 'dir', '_c': {...}} | {'_t': 'file'} }
+    """
+    root: dict = {}
+    prefix = _ROOT_FOLDER + "/"
+
+    for item in flat_items:
+        path: str = item.get("path", "")
+        kind: str = item.get("type", "")
+
+        if not path.startswith(prefix):
+            continue
+
+        rel = path[len(prefix):]
+        if not rel:
+            continue
+
+        if kind == "blob" and not rel.endswith(".html"):
+            continue
+
+        parts = rel.split("/")
+        node = root
+        for i, part in enumerate(parts):
+            is_last = (i == len(parts) - 1)
+            if is_last:
+                if kind == "blob":
+                    node[part] = {"_t": "file"}
+                else:
+                    node.setdefault(part, {"_t": "dir", "_c": {}})
+            else:
+                node.setdefault(part, {"_t": "dir", "_c": {}})
+                node = node[part]["_c"]
+
+    return root
+
+
+def _render_tree_html(node: dict, depth: int = 0) -> str:
+    """Recursively render the nested tree as HTML details/summary."""
+    if not node:
+        return '<p class="empty">— empty —</p>'
+
+    dirs  = sorted(k for k, v in node.items() if v["_t"] == "dir")
+    files = sorted(k for k, v in node.items() if v["_t"] == "file")
+    html  = ""
+
+    for name in dirs:
+        children = node[name].get("_c", {})
+        def _count(n):
+            t = sum(1 for v in n.values() if v["_t"] == "file")
+            for v in n.values():
+                if v["_t"] == "dir":
+                    t += _count(v.get("_c", {}))
+            return t
+        cnt = _count(children)
+        badge = f'<span class="badge">{cnt}</span>' if cnt else ""
+        inner = _render_tree_html(children, depth + 1)
+        html += (
+            f'<details>'
+            f'<summary><span class="arr">▶</span>📁 {name} {badge}</summary>'
+            f'<div class="indent">{inner}</div>'
+            f'</details>'
+        )
+
+    for name in files:
+        display = name[:-5] if name.endswith(".html") else name
+        html += f'<div class="file"><span class="fi">📄</span>{display}</div>'
+
+    return html
+
+
+@routes.get("/root-tree")
+async def root_tree_handler(request: web.Request) -> web.Response:
+    """Serve an interactive collapsible file index of the GitHub repo folder."""
+    token = Var.GIT_TOKEN
+    if not token:
+        return web.Response(
+            text="<!DOCTYPE html><html><body style='font-family:sans-serif;padding:40px;background:#0d1117;color:#f85149'>"
+                 "<h2>⚙️ Configuration Required</h2>"
+                 "<p>Set the <code>GIT_TOKEN</code> environment variable on the server and restart the bot.</p>"
+                 "</body></html>",
+            content_type="text/html", status=200
+        )
+
+    api_url = f"https://api.github.com/repos/{_ROOT_REPO}/git/trees/main?recursive=1"
+    headers_gh = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "StreamBot-FileIndex/1.0",
+    }
+
+    try:
+        async with aiohttp_client.ClientSession() as session:
+            async with session.get(api_url, headers=headers_gh, timeout=aiohttp_client.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    return web.Response(
+                        text=f"<h2>GitHub API error {resp.status}</h2><pre>{body[:500]}</pre>",
+                        content_type="text/html", status=502
+                    )
+                data = await resp.json()
+    except Exception as exc:
+        logging.error(f"root-tree GitHub fetch error: {exc}")
+        return web.Response(
+            text=f"<h2>Fetch error</h2><pre>{exc}</pre>",
+            content_type="text/html", status=502
+        )
+
+    truncated = data.get("truncated", False)
+    flat_items = data.get("tree", [])
+    tree = _build_tree(flat_items)
+    tree_html = _render_tree_html(tree)
+
+    ts = datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M UTC")
+    trunc_warn = (
+        '<p class="warn">⚠️ Repository tree was truncated by GitHub — some files may be missing.</p>'
+        if truncated else ""
+    )
+
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>File Index — {_ROOT_FOLDER}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px 16px;min-height:100vh}}
+h1{{color:#58a6ff;font-size:1.35rem;margin-bottom:4px}}
+.meta{{color:#8b949e;font-size:.78rem;margin-bottom:18px}}
+.warn{{background:#3d1f00;color:#e3b341;border:1px solid #e3b341;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.82rem}}
+.tree{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px 12px}}
+details{{margin:2px 0}}
+summary{{
+  cursor:pointer;padding:7px 10px;border-radius:6px;
+  display:flex;align-items:center;gap:6px;
+  font-weight:600;color:#58a6ff;
+  list-style:none;-webkit-tap-highlight-color:transparent
+}}
+summary::-webkit-details-marker{{display:none}}
+summary:hover{{background:#21262d}}
+details[open]>summary{{color:#79c0ff}}
+.arr{{font-size:.6rem;color:#8b949e;transition:transform .15s;display:inline-block;min-width:10px}}
+details[open]>summary .arr{{transform:rotate(90deg)}}
+.indent{{padding-left:18px;border-left:1px solid #30363d;margin-left:15px;margin-top:2px}}
+.file{{padding:6px 10px 6px 36px;color:#c9d1d9;font-size:.88rem;border-radius:4px;display:flex;align-items:center;gap:7px}}
+.file:hover{{background:#21262d}}
+.fi{{font-size:.9rem}}
+.badge{{background:#21262d;color:#8b949e;font-size:.68rem;padding:1px 6px;border-radius:10px;font-weight:400;margin-left:4px}}
+.empty{{color:#8b949e;font-style:italic;padding:6px 10px;font-size:.82rem}}
+</style>
+</head>
+<body>
+<h1>📁 File Index</h1>
+<p class="meta">Last updated: {ts}</p>
+{trunc_warn}
+<div class="tree">
+{tree_html}
+</div>
+</body>
+</html>"""
+
+    return web.Response(text=page, content_type="text/html", charset="utf-8")
