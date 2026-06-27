@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 from biisal.utils.human_readable import humanbytes
 from biisal.utils.database import Database
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from biisal.utils.file_properties import get_name, get_hash, get_media_file_size
 
 db = Database(Var.DATABASE_URL, Var.name)
@@ -107,14 +107,9 @@ async def cb_handler(client, query):
         await query.message.edit(f"Unban on <code>{user_id}</code> was executed silently.")
 
 
-@StreamBot.on_message(filters.private & filters.command('root'))
+@StreamBot.on_message(filters.private & filters.user(list(Var.ADMIN_IDS)) & filters.command('root'))
 async def root_command(bot, message):
     """Send the GitHub file index link to the requesting admin."""
-    user_id = message.from_user.id
-    admin_ids = getattr(Var, 'ADMIN_IDS', set()) or getattr(Var, 'OWNER_ID', set())
-    if not admin_ids or user_id not in admin_ids:
-        return
-
     base_url = Var.URL.rstrip('/')
     tree_url = f"{base_url}/root-tree"
     await message.reply_text(
@@ -123,7 +118,7 @@ async def root_command(bot, message):
         "Folders are expandable — click any folder to open it.\n"
         "Files are listed without the .html extension.",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📂 Open File Index", web_app=WebAppInfo(url=tree_url))
+            InlineKeyboardButton("📂 Open File Index", url=tree_url)
         ]]),
         quote=True
     )
