@@ -438,8 +438,16 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
 
     req_length = until_bytes - from_bytes + 1
     part_count = math.ceil(until_bytes / chunk_size) - math.floor(offset / chunk_size)
+
+    # Kick off a background prefetch so the entire file is downloaded to a
+    # local temp file regardless of whether the client keeps sending requests.
+    # Subsequent range requests for already-cached regions are served from disk
+    # instantly instead of going back to Telegram.
+    prefetch_entry = await tg_connect.ensure_prefetch(file_id, index)
+
     body = tg_connect.yield_file(
-        file_id, index, offset, first_part_cut, last_part_cut, part_count, chunk_size
+        file_id, index, offset, first_part_cut, last_part_cut, part_count, chunk_size,
+        entry=prefetch_entry,
     )
 
     mime_type = file_id.mime_type
