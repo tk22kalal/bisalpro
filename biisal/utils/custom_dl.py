@@ -230,6 +230,7 @@ class ByteStreamer:
                     yield chunk
                 
                 queue.task_done()
+                await asyncio.sleep(0)   # <--- ONLY CHANGE: yield control to event loop
 
         except Exception as e:
             logging.error(f"Streaming error on client {index}: {e}")
