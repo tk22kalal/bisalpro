@@ -11,7 +11,7 @@ class RateLimiter:
         # Track requests per IP: {ip: [(timestamp, count), ...]}
         self.ip_requests: Dict[str, list] = defaultdict(list)
         # Maximum requests per IP in time window
-        self.max_requests_per_window = 2  # Max 2 concurrent downloads per IP
+        self.max_requests_per_window = 5  # Max 2 concurrent downloads per IP
         self.time_window = 60  # 60 seconds window
         # Cooldown between requests from same IP
         self.min_delay_between_requests = 5  # 5 seconds between requests
