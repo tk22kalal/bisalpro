@@ -16,12 +16,9 @@ from pyrogram.file_id import FileId, FileType, ThumbnailSource
 
 
 # ── Prefetch cache ──────────────────────────────────────────────────────────
-# Keyed by Telegram media_id so the same physical file is only downloaded once
-# even if it is accessed via different message IDs.
+# Keyed by Telegram media_id so the same physical file is only downloaded once.
 _file_cache: Dict[int, "CacheEntry"] = {}
 
-# Maximum number of background prefetch downloads running at the same time.
-# Keeps disk and memory usage bounded.
 _MAX_CONCURRENT_PREFETCH = 3
 
 
@@ -63,21 +60,12 @@ class ByteStreamer:
         asyncio.create_task(self.clean_cache())
 
     async def get_file_properties(self, id: int) -> FileId:
-        """
-        Returns the properties of a media of a specific message in a FIleId class.
-        if the properties are cached, then it'll return the cached results.
-        or it'll generate the properties from the Message ID and cache them.
-        """
         if id not in self.cached_file_ids:
             await self.generate_file_properties(id)
             logging.debug(f"Cached file properties for message with ID {id}")
         return self.cached_file_ids[id]
-    
+
     async def generate_file_properties(self, id: int) -> FileId:
-        """
-        Generates the properties of a media file on a specific message.
-        returns ths properties in a FIleId class.
-        """
         file_id = await get_file_ids(self.client, Var.BIN_CHANNEL, id)
         logging.debug(f"Generated file ID and Unique ID for message with ID {id}")
         if not file_id:
@@ -88,11 +76,6 @@ class ByteStreamer:
         return self.cached_file_ids[id]
 
     async def generate_media_session(self, client: Client, file_id: FileId) -> Session:
-        """
-        Generates the media session for the DC that contains the media file.
-        This is required for getting the bytes from Telegram servers.
-        """
-
         media_session = client.media_sessions.get(file_id.dc_id, None)
 
         if media_session is None:
@@ -112,7 +95,6 @@ class ByteStreamer:
                     exported_auth = await client.invoke(
                         raw.functions.auth.ExportAuthorization(dc_id=file_id.dc_id)
                     )
-
                     try:
                         await media_session.send(
                             raw.functions.auth.ImportAuthorization(
@@ -121,9 +103,7 @@ class ByteStreamer:
                         )
                         break
                     except AuthBytesInvalid:
-                        logging.debug(
-                            f"Invalid authorization bytes for DC {file_id.dc_id}"
-                        )
+                        logging.debug(f"Invalid authorization bytes for DC {file_id.dc_id}")
                         continue
                 else:
                     await media_session.stop()
@@ -143,14 +123,12 @@ class ByteStreamer:
             logging.debug(f"Using cached media session for DC {file_id.dc_id}")
         return media_session
 
-
     @staticmethod
-    async def get_location(file_id: FileId) -> Union[raw.types.InputPhotoFileLocation,
-                                                     raw.types.InputDocumentFileLocation,
-                                                     raw.types.InputPeerPhotoFileLocation,]:
-        """
-        Returns the file location for the media file.
-        """
+    async def get_location(file_id: FileId) -> Union[
+        raw.types.InputPhotoFileLocation,
+        raw.types.InputDocumentFileLocation,
+        raw.types.InputPeerPhotoFileLocation,
+    ]:
         file_type = file_id.file_type
 
         if file_type == FileType.CHAT_PHOTO:
@@ -166,7 +144,6 @@ class ByteStreamer:
                         channel_id=utils.get_channel_id(file_id.chat_id),
                         access_hash=file_id.chat_access_hash,
                     )
-
             location = raw.types.InputPeerPhotoFileLocation(
                 peer=peer,
                 volume_id=file_id.volume_id,
@@ -193,16 +170,13 @@ class ByteStreamer:
 
     async def ensure_prefetch(self, file_id: FileId, index: int) -> Optional[CacheEntry]:
         """
-        Start a background full-file download for *file_id* if one is not
-        already running.  Returns the CacheEntry so the caller can pass it to
-        yield_file; returns None when prefetching is skipped (e.g. too many
-        concurrent downloads).
+        Start a background full-file download for file_id if one is not already
+        running. Returns the CacheEntry (or None if skipped).
         """
         key = file_id.media_id
         if key in _file_cache:
             return _file_cache[key]
 
-        # Guard against running too many parallel downloads at once.
         active = sum(
             1 for e in _file_cache.values()
             if e.task is not None and not e.complete and e.error is None
@@ -220,12 +194,8 @@ class ByteStreamer:
         return entry
 
     async def _run_prefetch(self, file_id: FileId, index: int, entry: CacheEntry) -> None:
-        """
-        Background coroutine: downloads the entire file sequentially into
-        entry.path, updating entry.bytes_written after each chunk so that
-        yield_file can serve already-downloaded parts from disk.
-        """
-        chunk_size = 1024 * 1024  # 1 MB
+        """Background coroutine: downloads the entire file into entry.path."""
+        chunk_size = 1024 * 1024
         current_offset = 0
         try:
             media_session = await self.generate_media_session(self.client, file_id)
@@ -245,9 +215,7 @@ class ByteStreamer:
                             timeout=30,
                         )
                     except asyncio.TimeoutError:
-                        logging.warning(
-                            f"Prefetch timeout at offset {current_offset}, retrying in 2s…"
-                        )
+                        logging.warning(f"Prefetch timeout at offset {current_offset}, retrying…")
                         await asyncio.sleep(2)
                         continue
 
@@ -258,9 +226,7 @@ class ByteStreamer:
                     await f.flush()
                     entry.bytes_written += len(r.bytes)
                     current_offset += chunk_size
-
-                    # Yield control so we don't block the event loop
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(0)  # yield control to event loop
 
             entry.complete = True
             logging.debug(
@@ -272,6 +238,39 @@ class ByteStreamer:
         except Exception as exc:
             logging.warning(f"Prefetch failed for media_id={file_id.media_id}: {exc}")
             entry.error = exc
+
+    async def _get_chunk_bytes(
+        self,
+        entry: Optional[CacheEntry],
+        media_session: Session,
+        location,
+        offset: int,
+        chunk_size: int,
+    ) -> Optional[bytes]:
+        """
+        Return bytes for one chunk. Tries the local prefetch cache first;
+        falls back to fetching directly from Telegram if the cache isn't ready.
+        """
+        if entry is not None:
+            needed_end = offset + chunk_size
+            if entry.bytes_written >= needed_end or (entry.complete and entry.bytes_written > offset):
+                try:
+                    async with aiofiles.open(entry.path, "rb") as f:
+                        await f.seek(offset)
+                        data = await f.read(chunk_size)
+                    if data:
+                        logging.debug(f"Served chunk at offset {offset} from prefetch cache")
+                        return data
+                except Exception as exc:
+                    logging.debug(f"Cache read at offset {offset} failed: {exc}")
+
+        # Fall back to Telegram (original behaviour)
+        r = await media_session.send(
+            raw.functions.upload.GetFile(location=location, offset=offset, limit=chunk_size)
+        )
+        if isinstance(r, raw.types.upload.File):
+            return r.bytes
+        return None
 
     # ── Streaming ───────────────────────────────────────────────────────────
 
@@ -289,76 +288,51 @@ class ByteStreamer:
         """
         Custom generator that yields the bytes of the media file.
 
-        For each chunk it first checks whether the prefetch background task has
-        already written that region to the local temp file.  If so the chunk is
-        read from disk (instant).  Otherwise it falls back to fetching the chunk
-        directly from Telegram — identical to the original behaviour — while the
-        background download continues uninterrupted.
+        Tries the local prefetch cache for each chunk before going to Telegram,
+        so seeks into already-downloaded regions are served from disk instantly.
+        Falls back to the original Telegram fetch when the cache isn't ready.
 
         Modded from <https://github.com/eyaadh/megadlbot_oss/blob/master/mega/telegram/utils/custom_download.py#L20>
         Thanks to Eyaadh <https://github.com/eyaadh>
         """
         client = self.client
         work_loads[index] += 1
-        logging.debug(f"Starting to yield file with client {index}.")
-
+        logging.debug(f"Starting to yielding file with client {index}.")
         media_session = await self.generate_media_session(client, file_id)
-        location = await self.get_location(file_id)
 
         current_part = 1
-        current_offset = offset
+        location = await self.get_location(file_id)
 
         try:
-            while True:
-                chunk = None
-
-                # ── Try the local prefetch cache first ──────────────────────
-                if entry is not None:
-                    cache_end = current_offset + chunk_size
-                    # The chunk is fully written when bytes_written has passed
-                    # the end of this chunk, OR the download is complete.
-                    if entry.bytes_written >= cache_end or entry.complete:
-                        try:
-                            async with aiofiles.open(entry.path, "rb") as f:
-                                await f.seek(current_offset)
-                                chunk = await f.read(chunk_size)
-                        except Exception as cache_err:
-                            logging.debug(f"Cache read failed at {current_offset}: {cache_err}")
-                            chunk = None
-
-                # ── Fall back to Telegram for this chunk ────────────────────
-                if not chunk:
-                    r = await media_session.send(
-                        raw.functions.upload.GetFile(
-                            location=location,
-                            offset=current_offset,
-                            limit=chunk_size,
-                        )
-                    )
-                    if not isinstance(r, raw.types.upload.File) or not r.bytes:
+            # Fetch the first chunk, then loop — mirrors the original structure exactly.
+            chunk = await self._get_chunk_bytes(entry, media_session, location, offset, chunk_size)
+            if chunk:
+                while True:
+                    if not chunk:
                         break
-                    chunk = r.bytes
+                    elif part_count == 1:
+                        yield chunk[first_part_cut:last_part_cut]
+                    elif current_part == 1:
+                        yield chunk[first_part_cut:]
+                    elif current_part == part_count:
+                        yield chunk[:last_part_cut]
+                    else:
+                        yield chunk
 
-                # ── Apply range cuts and yield ──────────────────────────────
-                if part_count == 1:
-                    yield chunk[first_part_cut:last_part_cut]
-                elif current_part == 1:
-                    yield chunk[first_part_cut:]
-                elif current_part == part_count:
-                    yield chunk[:last_part_cut]
-                else:
-                    yield chunk
+                    current_part += 1
+                    offset += chunk_size
 
-                current_part += 1
-                current_offset += chunk_size
+                    if current_part > part_count:
+                        break
 
-                if current_part > part_count:
-                    break
+                    chunk = await self._get_chunk_bytes(
+                        entry, media_session, location, offset, chunk_size
+                    )
 
         except (TimeoutError, AttributeError):
             pass
         finally:
-            logging.debug(f"Finished yielding file with {current_part} parts.")
+            logging.debug("Finished yielding file with {current_part} parts.")
             work_loads[index] -= 1
 
     async def clean_cache(self) -> None:
@@ -371,16 +345,15 @@ class ByteStreamer:
             self.cached_file_ids.clear()
             logging.debug("Cleaned the file-ID cache")
 
-            # Remove temp files for completed / failed prefetch entries.
             done_keys = [
                 k for k, e in _file_cache.items()
                 if e.complete or e.error is not None
             ]
             for k in done_keys:
-                entry = _file_cache.pop(k, None)
-                if entry and os.path.exists(entry.path):
+                e = _file_cache.pop(k, None)
+                if e and os.path.exists(e.path):
                     try:
-                        os.unlink(entry.path)
-                        logging.debug(f"Deleted prefetch temp file: {entry.path}")
-                    except Exception as unlink_err:
-                        logging.warning(f"Could not delete temp file {entry.path}: {unlink_err}")
+                        os.unlink(e.path)
+                        logging.debug(f"Deleted prefetch temp file: {e.path}")
+                    except Exception as exc:
+                        logging.warning(f"Could not delete temp file {e.path}: {exc}")
