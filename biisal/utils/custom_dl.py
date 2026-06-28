@@ -286,53 +286,86 @@ class ByteStreamer:
         entry: Optional[CacheEntry] = None,
     ) -> Union[str, None]:
         """
-        Custom generator that yields the bytes of the media file.
+        Custom generator that yields the bytes of the media file with
+        pipelined chunk pre-fetching.
 
-        Tries the local prefetch cache for each chunk before going to Telegram,
-        so seeks into already-downloaded regions are served from disk instantly.
-        Falls back to the original Telegram fetch when the cache isn't ready.
+        Instead of the old sequential pattern (fetch → yield → fetch → yield),
+        this keeps a sliding window of PIPELINE_SIZE concurrent Telegram
+        GetFile requests running in the background.  While the current chunk is
+        being sent to the client the next chunks are already in-flight, so the
+        Telegram round-trip time is hidden behind the client transfer time and
+        throughput is multiplied accordingly.
+
+        Each chunk also checks the local prefetch cache first, so seeks into
+        already-downloaded regions are instant.
 
         Modded from <https://github.com/eyaadh/megadlbot_oss/blob/master/mega/telegram/utils/custom_download.py#L20>
         Thanks to Eyaadh <https://github.com/eyaadh>
         """
+        # Number of chunks to keep in-flight at once.
+        # 3 × 1 MB = 3 MB lookahead; raise to 4-5 for very fast connections.
+        PIPELINE_SIZE = 3
+
         client = self.client
         work_loads[index] += 1
-        logging.debug(f"Starting to yielding file with client {index}.")
+        logging.debug(f"Starting to yield file with client {index} (pipeline={PIPELINE_SIZE}).")
         media_session = await self.generate_media_session(client, file_id)
-
-        current_part = 1
         location = await self.get_location(file_id)
 
+        # Sliding window: a deque of asyncio.Tasks, each fetching one chunk.
+        from collections import deque
+        pending: deque = deque()
+        # next_sched_part tracks which part number to schedule next (1-indexed).
+        next_sched_part = 1
+
+        def _schedule_next():
+            """Push one more fetch task onto the window if parts remain."""
+            nonlocal next_sched_part
+            if next_sched_part > part_count:
+                return
+            fetch_offset = offset + (next_sched_part - 1) * chunk_size
+            t = asyncio.create_task(
+                self._get_chunk_bytes(entry, media_session, location, fetch_offset, chunk_size)
+            )
+            pending.append(t)
+            next_sched_part += 1
+
+        # Fill the initial window.
+        for _ in range(min(PIPELINE_SIZE, part_count)):
+            _schedule_next()
+
+        current_part = 1
         try:
-            # Fetch the first chunk, then loop — mirrors the original structure exactly.
-            chunk = await self._get_chunk_bytes(entry, media_session, location, offset, chunk_size)
-            if chunk:
-                while True:
-                    if not chunk:
-                        break
-                    elif part_count == 1:
-                        yield chunk[first_part_cut:last_part_cut]
-                    elif current_part == 1:
-                        yield chunk[first_part_cut:]
-                    elif current_part == part_count:
-                        yield chunk[:last_part_cut]
-                    else:
-                        yield chunk
+            while pending:
+                chunk = await pending.popleft()
+                if not chunk:
+                    break
 
-                    current_part += 1
-                    offset += chunk_size
+                # Apply byte-range cuts on first and last parts.
+                if part_count == 1:
+                    yield chunk[first_part_cut:last_part_cut]
+                elif current_part == 1:
+                    yield chunk[first_part_cut:]
+                elif current_part == part_count:
+                    yield chunk[:last_part_cut]
+                else:
+                    yield chunk
 
-                    if current_part > part_count:
-                        break
+                current_part += 1
 
-                    chunk = await self._get_chunk_bytes(
-                        entry, media_session, location, offset, chunk_size
-                    )
+                # The `yield` above suspends this generator while aiohttp sends
+                # the chunk to the client.  During that suspension the already-
+                # scheduled tasks continue running in the background, so the
+                # next chunk is often ready by the time we need it.
+                _schedule_next()  # keep the window full
 
         except (TimeoutError, AttributeError):
             pass
         finally:
-            logging.debug("Finished yielding file with {current_part} parts.")
+            # Cancel any in-flight tasks that were not consumed.
+            for t in pending:
+                t.cancel()
+            logging.debug(f"Finished yielding file with {current_part - 1} parts.")
             work_loads[index] -= 1
 
     async def clean_cache(self) -> None:
