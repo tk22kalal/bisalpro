@@ -363,12 +363,11 @@ async def _home_dc(index: int) -> int:
 
 async def media_streamer(request: web.Request, id: int, secure_hash: str):
     """
-    Optimized media streamer using StreamResponse for faster loading 
-    and better compatibility with HTML5 players.
+    Optimized media streamer using StreamResponse and prefetching for high-speed streaming.
     """
     range_header = request.headers.get("Range", 0)
 
-    # Multi-client logic: find the best client
+    # Multi-client logic: find the least busy bot
     sorted_indices = sorted(work_loads, key=work_loads.get)
     candidates = sorted_indices[:3] if len(sorted_indices) >= 3 else sorted_indices
 
@@ -393,20 +392,31 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
             )
             index = candidate_index
             tg_connect = streamer
+            if Var.MULTI_CLIENT or attempt > 0:
+                logging.info(
+                    f"Client {index} serving {request.remote}"
+                    + (f" (retry attempt {attempt})" if attempt > 0 else "")
+                )
             break
+        except asyncio.TimeoutError:
+            last_error = f"Client {candidate_index} timed out fetching file properties"
+            logging.warning(f"{last_error}, trying next client...")
+        except FIleNotFound:
+            raise
         except Exception as e:
             last_error = str(e)
-            continue
+            logging.warning(f"Client {candidate_index} failed ({e}), trying next client...")
 
     if file_id is None:
-        raise web.HTTPServiceUnavailable(text="Stream unavailable.")
+        logging.error(f"All clients failed to fetch file properties. Last error: {last_error}")
+        raise web.HTTPServiceUnavailable(text="Stream unavailable, please try again.")
 
     if file_id.unique_id[:6] != secure_hash:
         raise InvalidHash
 
     file_size = file_id.file_size
 
-    # Handle Range Headers for Seeking in Plyr/Video.js
+    # Handle Range Headers for Seeking (Crucial for Video.js/Plyr)
     if range_header:
         from_bytes, until_bytes = range_header.replace("bytes=", "").split("-")
         from_bytes = int(from_bytes)
@@ -431,36 +441,41 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
 
     req_length = until_bytes - from_bytes + 1
     part_count = math.ceil((until_bytes + 1) / chunk_size) - math.floor(offset / chunk_size)
-    
-    mime_type = file_id.mime_type or mimetypes.guess_type(file_id.file_name)[0] or "application/octet-stream"
+
+    mime_type = file_id.mime_type or "application/octet-stream"
     file_name = file_id.file_name
     if file_name:
         file_name = re.sub(r"[\r\n\t\x00-\x1f\x7f]", "", str(file_name)).strip()
+        if not file_name:
+            file_name = f"{secrets.token_hex(2)}.bin"
 
-    # Create StreamResponse for immediate data flow
+    # Use StreamResponse for better performance and reduced buffering
     response = web.StreamResponse(
         status=206 if range_header else 200,
         headers={
-            "Content-Type": mime_type,
+            "Content-Type": f"{mime_type}",
             "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
             "Content-Length": str(req_length),
-            "Content-Disposition": f'attachment; filename="{file_name or "file"}"',
+            "Content-Disposition": f'attachment; filename="{file_name}"',
             "Accept-Ranges": "bytes",
-            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*", # Good for PWA usage
         },
     )
 
     await response.prepare(request)
 
-    # Use the prefetching generator from ByteStreamer
     try:
+        # yield_file is now an optimized async generator in custom_dl.py
         async for chunk in tg_connect.yield_file(
             file_id, index, offset, first_part_cut, last_part_cut, part_count, chunk_size
         ):
             await response.write(chunk)
+    except (ConnectionResetError, RuntimeError):
+        # User closed the player or disconnected
+        pass
     except Exception as e:
-        logging.error(f"Streaming error: {e}")
-    
+        logging.error(f"Streaming error on request: {e}")
+
     return response
 
 
@@ -473,6 +488,11 @@ _ROOT_FOLDER = "1234xxx"
 
 
 def _build_tree(flat_items: list) -> dict:
+    """
+    Convert GitHub's flat tree list into a nested dict.
+    Only keeps .html blobs and their parent directories inside _ROOT_FOLDER.
+    Structure: { name: {'_t': 'dir', '_c': {...}} | {'_t': 'file'} }
+    """
     root: dict = {}
     prefix = _ROOT_FOLDER + "/"
 
@@ -507,6 +527,7 @@ def _build_tree(flat_items: list) -> dict:
 
 
 def _render_tree_html(node: dict, depth: int = 0) -> str:
+    """Recursively render the nested tree as HTML details/summary."""
     if not node:
         return '<p class="empty">— empty —</p>'
 
@@ -541,6 +562,7 @@ def _render_tree_html(node: dict, depth: int = 0) -> str:
 
 @routes.get("/root-tree")
 async def root_tree_handler(request: web.Request) -> web.Response:
+    """Serve an interactive collapsible file index of the GitHub repo folder."""
     token = Var.GIT_TOKEN
     if not token:
         return web.Response(
@@ -615,6 +637,7 @@ details[open]>summary .arr{{transform:rotate(90deg)}}
 .file{{padding:6px 10px 6px 36px;color:#c9d1d9;font-size:.88rem;border-radius:4px;display:flex;align-items:center;gap:7px}}
 .file:hover{{background:#21262d}}
 .fi{{font-size:.9rem}}
+.badge{{background:#21262d;color:#8b949e;font-size:.68rem;padding:1px 6px;border-radius:10px;font-weight:400;margin-left:4px}}
 .badge{{background:#21262d;color:#8b949e;font-size:.68rem;padding:1px 6px;border-radius:10px;font-weight:400;margin-left:4px}}
 .empty{{color:#8b949e;font-style:italic;padding:6px 10px;font-size:.82rem}}
 </style>
