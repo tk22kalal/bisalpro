@@ -22,34 +22,35 @@
             height: 100vh;
         }
 
-        /* Marquee Header */
+        /* Marquee – now a static bar above the video, no overlap */
         marquee {
             font-size: 16px;
             font-weight: 400;
             color: #fff;
-            padding: 15px;
+            padding: 10px 15px;
             width: 100%;
-            position: absolute;
-            top: 0;
-            z-index: 10;
+            flex-shrink: 0;              /* doesn’t shrink */
+            background: #000;            /* solid background so it doesn’t show through */
         }
 
         .container {
+            flex: 1;                     /* fills remaining height */
             width: 100%;
-            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;           /* keeps the video contained */
         }
 
         .video-wrapper {
             width: 100%;
             position: relative;
+            /* the player will take the height it needs */
         }
 
-        /* ----- THE BIG CENTER PLAY BUTTON ----- */
+        /* ----- THE BIG CENTER PLAY BUTTON (off‑white circle) ----- */
         .vjs-big-play-button {
-            background-color: #e3e3e3 !important; /* Off-white circle */
+            background-color: #e3e3e3 !important;
             border: none !important;
             border-radius: 50% !important;
             width: 80px !important;
@@ -61,37 +62,36 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
         }
 
-        /* The black triangle icon */
+        /* Black triangle icon */
         .vjs-big-play-button .vjs-icon-placeholder:before {
             color: #000 !important;
             font-size: 40px !important;
-            content: "\f101" !important; /* Video.js play icon */
+            content: "\f101" !important;
         }
 
-        /* ----- CONTROL BAR LAYOUT ----- */
+        /* ----- CONTROL BAR LAYOUT (two rows) ----- */
         .vjs-control-bar {
             background: linear-gradient(transparent, rgba(0,0,0,0.7)) !important;
             display: flex !important;
             flex-wrap: wrap !important;
-            height: 80px !important; /* Taller to fit two rows */
+            height: 80px !important;
             align-items: center !important;
             padding: 0 10px !important;
         }
 
-        /* Row 1: Time on left, Buttons on right */
-        .vjs-current-time { 
-            display: block !important; 
+        /* Row 1: Time on left, buttons on right */
+        .vjs-current-time {
+            display: block !important;
             order: 1;
             font-size: 16px !important;
         }
         .vjs-time-divider, .vjs-duration, .vjs-remaining-time-display { display: none !important; }
 
-        /* Push remaining icons to the right */
         .vjs-volume-panel { order: 2; margin-left: auto !important; }
         .vjs-fullscreen-control { order: 3; }
-        .vjs-playback-rate { order: 4; } /* Acting as our 'menu' placeholder */
+        .vjs-playback-rate { order: 4; }
 
-        /* Row 2: Progress Bar at the very bottom */
+        /* Row 2: Progress Bar full width */
         .vjs-progress-control {
             order: 5;
             width: 100% !important;
@@ -99,19 +99,18 @@
             position: relative;
         }
 
-        /* ----- PROGRESS BAR STYLING ----- */
+        /* ----- PROGRESS BAR STYLING (white) ----- */
         .video-js .vjs-progress-holder {
             height: 4px !important;
             margin: 0 !important;
             background-color: rgba(255,255,255,0.3) !important;
         }
 
-        /* The filled part of the bar (White) */
         .video-js .vjs-play-progress {
             background-color: #fff !important;
         }
 
-        /* The Circle Scrubber (Thumb) */
+        /* Circle scrubber */
         .video-js .vjs-play-progress:before {
             font-size: 18px !important;
             color: #fff !important;
@@ -120,16 +119,15 @@
             text-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
-        /* Icon Styling */
+        /* Icons */
         .vjs-button > .vjs-icon-placeholder:before {
             font-size: 22px !important;
             line-height: 1.8 !important;
         }
 
-        /* Hide unnecessary clutter */
         .vjs-picture-in-picture-control { display: none !important; }
 
-        /* Mobile Optimization */
+        /* Mobile */
         @media (max-width: 768px) {
             .vjs-big-play-button { width: 60px !important; height: 60px !important; line-height: 60px !important; }
             .vjs-big-play-button .vjs-icon-placeholder:before { font-size: 30px !important; }
@@ -138,6 +136,7 @@
 </head>
 <body>
 
+    <!-- Marquee now sits above the video, not over it -->
     <marquee scrollamount="5">{{ file_name }}</marquee>
 
     <div class="container">
@@ -164,13 +163,26 @@
                     'currentTimeDisplay',
                     'volumePanel',
                     'fullscreenToggle',
-                    'playbackRateMenuButton', // Used as the 'three dots' menu substitute
+                    'playbackRateMenuButton',
                     'progressControl'
                 ]
             }
         });
 
-        // Double tap to seek logic
+        // --- FIX: Tap the middle of the video to toggle play/pause ---
+        player.on('click', function(e) {
+            // Ignore clicks on the control bar and the big button (it handles itself)
+            if (e.target.closest('.vjs-control-bar') || e.target.closest('.vjs-big-play-button')) {
+                return;
+            }
+            if (player.paused()) {
+                player.play();
+            } else {
+                player.pause();
+            }
+        });
+
+        // --- Double tap to seek (unchanged) ---
         const container = document.getElementById('player-container');
         let lastTap = 0;
         container.addEventListener('touchstart', function(e) {
@@ -188,7 +200,7 @@
             lastTap = now;
         });
 
-        // Handle auto-retry on error
+        // --- Error recovery (unchanged) ---
         player.on('error', function() {
             setTimeout(() => { player.load(); player.play(); }, 3000);
         });
