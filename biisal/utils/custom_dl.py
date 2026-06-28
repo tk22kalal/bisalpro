@@ -1,8 +1,11 @@
+import os
 import math
 import asyncio
 import logging
+import tempfile
+import aiofiles
 from biisal.vars import Var
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 from biisal.bot import work_loads
 from pyrogram import Client, utils, raw
 from .file_properties import get_file_ids
@@ -11,6 +14,32 @@ from pyrogram.errors import AuthBytesInvalid
 from biisal.server.exceptions import FIleNotFound
 from pyrogram.file_id import FileId, FileType, ThumbnailSource
 
+
+# ── Prefetch cache ──────────────────────────────────────────────────────────
+# Keyed by Telegram media_id so the same physical file is only downloaded once
+# even if it is accessed via different message IDs.
+_file_cache: Dict[int, "CacheEntry"] = {}
+
+# Maximum number of background prefetch downloads running at the same time.
+# Keeps disk and memory usage bounded.
+_MAX_CONCURRENT_PREFETCH = 3
+
+
+class CacheEntry:
+    """State for one file's background prefetch download."""
+
+    __slots__ = ("path", "total_size", "bytes_written", "complete", "task", "error")
+
+    def __init__(self, path: str, total_size: int) -> None:
+        self.path = path
+        self.total_size = total_size
+        self.bytes_written: int = 0
+        self.complete: bool = False
+        self.task: Optional[asyncio.Task] = None
+        self.error: Optional[Exception] = None
+
+
+# ── ByteStreamer ────────────────────────────────────────────────────────────
 
 class ByteStreamer:
     def __init__(self, client: Client):
@@ -160,6 +189,92 @@ class ByteStreamer:
             )
         return location
 
+    # ── Prefetch helpers ────────────────────────────────────────────────────
+
+    async def ensure_prefetch(self, file_id: FileId, index: int) -> Optional[CacheEntry]:
+        """
+        Start a background full-file download for *file_id* if one is not
+        already running.  Returns the CacheEntry so the caller can pass it to
+        yield_file; returns None when prefetching is skipped (e.g. too many
+        concurrent downloads).
+        """
+        key = file_id.media_id
+        if key in _file_cache:
+            return _file_cache[key]
+
+        # Guard against running too many parallel downloads at once.
+        active = sum(
+            1 for e in _file_cache.values()
+            if e.task is not None and not e.complete and e.error is None
+        )
+        if active >= _MAX_CONCURRENT_PREFETCH:
+            logging.debug("Prefetch skipped: too many concurrent downloads")
+            return None
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".tgcache")
+        tmp.close()
+        entry = CacheEntry(path=tmp.name, total_size=file_id.file_size)
+        _file_cache[key] = entry
+        entry.task = asyncio.create_task(self._run_prefetch(file_id, index, entry))
+        logging.debug(f"Prefetch started for media_id={key} size={file_id.file_size}")
+        return entry
+
+    async def _run_prefetch(self, file_id: FileId, index: int, entry: CacheEntry) -> None:
+        """
+        Background coroutine: downloads the entire file sequentially into
+        entry.path, updating entry.bytes_written after each chunk so that
+        yield_file can serve already-downloaded parts from disk.
+        """
+        chunk_size = 1024 * 1024  # 1 MB
+        current_offset = 0
+        try:
+            media_session = await self.generate_media_session(self.client, file_id)
+            location = await self.get_location(file_id)
+
+            async with aiofiles.open(entry.path, "wb") as f:
+                while current_offset < entry.total_size:
+                    try:
+                        r = await asyncio.wait_for(
+                            media_session.send(
+                                raw.functions.upload.GetFile(
+                                    location=location,
+                                    offset=current_offset,
+                                    limit=chunk_size,
+                                )
+                            ),
+                            timeout=30,
+                        )
+                    except asyncio.TimeoutError:
+                        logging.warning(
+                            f"Prefetch timeout at offset {current_offset}, retrying in 2s…"
+                        )
+                        await asyncio.sleep(2)
+                        continue
+
+                    if not isinstance(r, raw.types.upload.File) or not r.bytes:
+                        break
+
+                    await f.write(r.bytes)
+                    await f.flush()
+                    entry.bytes_written += len(r.bytes)
+                    current_offset += chunk_size
+
+                    # Yield control so we don't block the event loop
+                    await asyncio.sleep(0)
+
+            entry.complete = True
+            logging.debug(
+                f"Prefetch complete for media_id={file_id.media_id}: "
+                f"{entry.bytes_written}/{entry.total_size} bytes"
+            )
+        except asyncio.CancelledError:
+            logging.debug(f"Prefetch cancelled for media_id={file_id.media_id}")
+        except Exception as exc:
+            logging.warning(f"Prefetch failed for media_id={file_id.media_id}: {exc}")
+            entry.error = exc
+
+    # ── Streaming ───────────────────────────────────────────────────────────
+
     async def yield_file(
         self,
         file_id: FileId,
@@ -169,68 +284,103 @@ class ByteStreamer:
         last_part_cut: int,
         part_count: int,
         chunk_size: int,
+        entry: Optional[CacheEntry] = None,
     ) -> Union[str, None]:
         """
         Custom generator that yields the bytes of the media file.
+
+        For each chunk it first checks whether the prefetch background task has
+        already written that region to the local temp file.  If so the chunk is
+        read from disk (instant).  Otherwise it falls back to fetching the chunk
+        directly from Telegram — identical to the original behaviour — while the
+        background download continues uninterrupted.
+
         Modded from <https://github.com/eyaadh/megadlbot_oss/blob/master/mega/telegram/utils/custom_download.py#L20>
         Thanks to Eyaadh <https://github.com/eyaadh>
         """
         client = self.client
         work_loads[index] += 1
-        logging.debug(f"Starting to yielding file with client {index}.")
-        try:
-            media_session = await self.generate_media_session(client, file_id)
-        except AuthBytesInvalid:
-            logging.warning(f"AuthBytesInvalid for client {index}, cannot stream file.")
-            work_loads[index] -= 1
-            return
+        logging.debug(f"Starting to yield file with client {index}.")
 
-        current_part = 1
+        media_session = await self.generate_media_session(client, file_id)
         location = await self.get_location(file_id)
 
+        current_part = 1
+        current_offset = offset
+
         try:
-            r = await media_session.send(
-                raw.functions.upload.GetFile(
-                    location=location, offset=offset, limit=chunk_size
-                ),
-            )
-            if isinstance(r, raw.types.upload.File):
-                while True:
-                    chunk = r.bytes
-                    if not chunk:
-                        break
-                    elif part_count == 1:
-                        yield chunk[first_part_cut:last_part_cut]
-                    elif current_part == 1:
-                        yield chunk[first_part_cut:]
-                    elif current_part == part_count:
-                        yield chunk[:last_part_cut]
-                    else:
-                        yield chunk
+            while True:
+                chunk = None
 
-                    current_part += 1
-                    offset += chunk_size
+                # ── Try the local prefetch cache first ──────────────────────
+                if entry is not None:
+                    cache_end = current_offset + chunk_size
+                    # The chunk is fully written when bytes_written has passed
+                    # the end of this chunk, OR the download is complete.
+                    if entry.bytes_written >= cache_end or entry.complete:
+                        try:
+                            async with aiofiles.open(entry.path, "rb") as f:
+                                await f.seek(current_offset)
+                                chunk = await f.read(chunk_size)
+                        except Exception as cache_err:
+                            logging.debug(f"Cache read failed at {current_offset}: {cache_err}")
+                            chunk = None
 
-                    if current_part > part_count:
-                        break
-
+                # ── Fall back to Telegram for this chunk ────────────────────
+                if not chunk:
                     r = await media_session.send(
                         raw.functions.upload.GetFile(
-                            location=location, offset=offset, limit=chunk_size
-                        ),
+                            location=location,
+                            offset=current_offset,
+                            limit=chunk_size,
+                        )
                     )
+                    if not isinstance(r, raw.types.upload.File) or not r.bytes:
+                        break
+                    chunk = r.bytes
+
+                # ── Apply range cuts and yield ──────────────────────────────
+                if part_count == 1:
+                    yield chunk[first_part_cut:last_part_cut]
+                elif current_part == 1:
+                    yield chunk[first_part_cut:]
+                elif current_part == part_count:
+                    yield chunk[:last_part_cut]
+                else:
+                    yield chunk
+
+                current_part += 1
+                current_offset += chunk_size
+
+                if current_part > part_count:
+                    break
+
         except (TimeoutError, AttributeError):
             pass
         finally:
-            logging.debug("Finished yielding file with {current_part} parts.")
+            logging.debug(f"Finished yielding file with {current_part} parts.")
             work_loads[index] -= 1
 
-    
     async def clean_cache(self) -> None:
         """
-        function to clean the cache to reduce memory usage
+        Periodically clears the in-memory file-ID cache and removes temp files
+        for prefetch downloads that have finished (successfully or with an error).
         """
         while True:
             await asyncio.sleep(self.clean_timer)
             self.cached_file_ids.clear()
-            logging.debug("Cleaned the cache")
+            logging.debug("Cleaned the file-ID cache")
+
+            # Remove temp files for completed / failed prefetch entries.
+            done_keys = [
+                k for k, e in _file_cache.items()
+                if e.complete or e.error is not None
+            ]
+            for k in done_keys:
+                entry = _file_cache.pop(k, None)
+                if entry and os.path.exists(entry.path):
+                    try:
+                        os.unlink(entry.path)
+                        logging.debug(f"Deleted prefetch temp file: {entry.path}")
+                    except Exception as unlink_err:
+                        logging.warning(f"Could not delete temp file {entry.path}: {unlink_err}")
