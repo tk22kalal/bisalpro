@@ -470,6 +470,7 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
             file_id, index, offset, first_part_cut, last_part_cut, part_count, chunk_size
         ):
             await response.write(chunk)
+            await asyncio.sleep(0)  # <--- ONLY CHANGE: yield control to event loop
     except (ConnectionResetError, RuntimeError):
         # User closed the player or disconnected
         pass
