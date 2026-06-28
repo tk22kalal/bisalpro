@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ file_name }}</title>
-    
+
     <!-- Video.js CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,700">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
-    
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -20,7 +20,7 @@
             overflow-x: hidden;
         }
 
-        /* Marquee header – now exactly like Code 2 */
+        /* Marquee – same clean look as Code 2 */
         marquee {
             font-size: 18px;
             font-weight: 600;
@@ -51,18 +51,58 @@
             aspect-ratio: 16 / 9;
         }
 
-        /* Video.js Theme Tweaks */
+        /* ---------- Player Controls from Code 2 (minus quality button) ---------- */
         .vjs-big-play-button {
-            background-color: rgba(0, 123, 255, 0.5) !important;
             border-radius: 50% !important;
-            width: 2.5em !important;
-            height: 2.5em !important;
-            line-height: 2.5em !important;
-            margin-top: -1.25em !important;
-            margin-left: -1.25em !important;
+            width: 2em !important;
+            height: 2em !important;
+            line-height: 2em !important;
+            border: 0.06666em solid #fff !important;
+            background-color: rgba(43,51,63,0.7) !important;
+            left: 50% !important;
+            top: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            margin-top: 0 !important;
+            margin-left: 0 !important;
         }
 
-        /* Mobile responsive font size */
+        .vjs-control-bar {
+            background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important;
+        }
+
+        .vjs-tech {
+            object-fit: contain;
+        }
+
+        .vjs-menu-button-popup .vjs-menu {
+            left: auto !important;
+            right: 0 !important;
+        }
+
+        .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+            background-color: rgba(0,0,0,0.9) !important;
+            max-height: 20em !important;
+        }
+
+        .vjs-menu li.vjs-selected {
+            background-color: rgba(255,255,255,0.2) !important;
+        }
+
+        .vjs-playback-rate .vjs-playback-rate-value {
+            font-size: 1.5em;
+            line-height: 2;
+        }
+
+        /* Hide download button completely */
+        a[download],
+        .vjs-control[download],
+        .video-js *[download] {
+            display: none !important;
+        }
+        video::-webkit-media-controls-download-button {
+            display: none !important;
+        }
+
         @media (max-width: 768px) {
             marquee {
                 font-size: 14px;
@@ -74,45 +114,54 @@
 <body>
 
     <header>
-        <!-- Marquee with just the file name (no "Playing:" text) -->
         <marquee scrollamount="6">{{ file_name }}</marquee>
     </header>
 
     <div class="container">
         <div class="video-wrapper" id="player-container">
-            <video 
-                id="main-player" 
-                class="video-js vjs-big-play-centered vjs-show-big-play-button-on-pause" 
-                controls 
-                preload="auto" 
-                playsinline>
+            <video
+                id="main-player"
+                class="video-js vjs-big-play-centered vjs-show-big-play-button-on-pause"
+                controls
+                preload="auto"
+                playsinline
+                controlsList="nodownload"
+                oncontextmenu="return false;">
                 <source src="{{ file_url }}" type="application/x-mpegURL">
                 <source src="{{ file_url }}" type="video/mp4">
             </video>
-
-            <!-- Visual feedback indicators removed (no double‑tap icons) -->
+            <!-- No double‑tap icons -->
         </div>
-
-        <!-- File details block removed (no "file name" heading or black box) -->
     </div>
 
     <!-- Video.js Core Script -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <!-- HTTP Streaming plugin (needed for HLS) -->
+    <script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.12.0/dist/videojs-http-streaming.min.js"></script>
 
     <script>
+        // --- Player Initialisation (no quality button) ---
         const player = videojs('main-player', {
             fluid: true,
             playbackRates: [0.5, 1, 1.25, 1.5, 2],
             controlBar: {
                 children: [
                     'playToggle',
-                    'volumePanel',
                     'currentTimeDisplay',
-                    'progressControl',
+                    'timeDivider',
                     'durationDisplay',
+                    'progressControl',
+                    'volumePanel',
                     'playbackRateMenuButton',
+                    'pictureInPictureToggle',
                     'fullscreenToggle'
                 ]
+            },
+            html5: {
+                vhs: {
+                    overrideNative: true,
+                    smoothQualityChange: true
+                }
             }
         });
 
@@ -130,10 +179,10 @@
                 const midPoint = rect.width / 2;
 
                 if (touchX < midPoint) {
-                    // Double tapped left
+                    // Left double tap → seek backward 10s
                     player.currentTime(Math.max(0, player.currentTime() - 10));
                 } else {
-                    // Double tapped right
+                    // Right double tap → seek forward 10s
                     player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
                 }
                 e.preventDefault(); // Prevent zooming
@@ -143,15 +192,18 @@
 
         // --- ERROR RECOVERY ---
         player.on('error', function() {
-            setTimeout(() => {
-                player.src({ src: '{{ file_url }}', type: '{{ file_url }}'.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
+            setTimeout(function() {
+                player.src({
+                    src: '{{ file_url }}',
+                    type: '{{ file_url }}'.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4'
+                });
                 player.load();
                 player.play();
             }, 3000);
         });
 
-        // Disable right click to protect link slightly
-        container.addEventListener('contextmenu', e => e.preventDefault());
+        // Disable right click
+        container.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     </script>
 </body>
 </html>
