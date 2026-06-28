@@ -2,267 +2,283 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta property="og:image" content="https://graph.org/file/5e6d18610741226005e6e.jpg" itemprop="thumbnailUrl">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="monetag" content="f3ecc71ccb639ccf66d9d0dee93d3e7a">
     <title>{{ file_name }}</title>
-
-    <!-- Video.js CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700">
-
+    
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             background: #000;
-            font-family: 'Roboto', sans-serif;
-            color: white;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            font-family: 'Raleway', sans-serif;
+            overflow-x: hidden;
         }
-
-        /* Marquee – static bar above the video */
+        
         marquee {
-            font-size: 16px;
-            font-weight: 400;
+            font-size: 18px;
+            font-weight: 600;
             color: #fff;
-            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
             width: 100%;
-            flex-shrink: 0;
-            background: #000;
+            z-index: 999;
         }
-
+        
         .container {
-            flex: 1;
             width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            background: #000;
             position: relative;
         }
-
-        .video-wrapper {
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-
-        /* Video player */
+        
         .video-js {
             width: 100% !important;
-            height: 100% !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9;
         }
-
-        /* ----- THE BIG CENTER PLAY BUTTON (off‑white circle) ----- */
+        
+        audio.video-js {
+            height: 80px !important;
+        }
+        
+        .vjs-tech {
+            object-fit: contain;
+        }
+        
+        .tap-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 60px;
+            color: rgba(255, 255, 255, 0.95);
+            pointer-events: none;
+            z-index: 10000;
+            animation: tapFade 0.5s ease-out;
+            text-shadow: 0 3px 15px rgba(0, 0, 0, 0.9);
+            font-weight: bold;
+        }
+        
+        .tap-indicator.left {
+            left: 50px;
+        }
+        
+        .tap-indicator.right {
+            right: 50px;
+        }
+        
+        @keyframes tapFade {
+            0% {
+                opacity: 1;
+                transform: translateY(-50%) scale(0.8);
+            }
+            50% {
+                transform: translateY(-50%) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50%) scale(0.8);
+            }
+        }
+        
+        .vjs-control-bar {
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)) !important;
+        }
+        
         .vjs-big-play-button {
-            background-color: #e3e3e3 !important;
-            border: none !important;
             border-radius: 50% !important;
-            width: 100px !important;
-            height: 100px !important;
-            line-height: 100px !important;
+            width: 2em !important;
+            height: 2em !important;
+            line-height: 2em !important;
+            border: 0.06666em solid #fff !important;
+            background-color: rgba(43, 51, 63, 0.7) !important;
             left: 50% !important;
             top: 50% !important;
             transform: translate(-50%, -50%) !important;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
-            z-index: 10 !important;
         }
-
-        /* Black triangle icon */
-        .vjs-big-play-button .vjs-icon-placeholder:before {
-            color: #000 !important;
-            font-size: 45px !important;
-            content: "\f101" !important;
-        }
-
-        /* ----- CONTROL BAR (bottom of video) ----- */
-        .vjs-control-bar {
-            background: linear-gradient(transparent, rgba(0,0,0,0.8)) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            height: auto !important;
-            align-items: stretch !important;
-            padding: 0 !important;
-            position: absolute !important;
-            bottom: 0 !important;
-            left: 0 !important;
+        
+        .vjs-menu-button-popup .vjs-menu {
+            left: auto !important;
             right: 0 !important;
-            width: 100% !important;
-            z-index: 20 !important;
         }
-
-        /* Progress bar row (full width) */
-        .vjs-progress-control {
-            order: 1;
-            width: 100% !important;
-            height: 30px !important;
-            display: flex !important;
-            align-items: center !important;
-            padding: 5px 10px !important;
-            box-sizing: border-box !important;
+        
+        .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+            background-color: rgba(0, 0, 0, 0.9) !important;
+            max-height: 20em !important;
         }
-
-        /* ----- PROGRESS BAR STYLING (white) ----- */
-        .video-js .vjs-progress-holder {
-            height: 6px !important;
-            margin: 0 !important;
-            background-color: rgba(255,255,255,0.3) !important;
-            flex: 1;
-            position: relative;
+        
+        .vjs-menu li.vjs-selected {
+            background-color: rgba(255, 255, 255, 0.2) !important;
         }
-
-        .video-js .vjs-play-progress {
-            background-color: #fff !important;
-            height: 6px !important;
+        
+        .vjs-playback-rate .vjs-playback-rate-value {
+            font-size: 1.5em;
+            line-height: 2;
         }
-
-        /* Circle scrubber */
-        .video-js .vjs-play-progress:before {
-            font-size: 16px !important;
-            color: #fff !important;
-            top: -5px !important;
-            content: "●" !important;
-            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        
+        a[download], .vjs-control[download] {
+            display: none !important;
         }
-
-        /* Control buttons row */
-        .vjs-control-bar > div:not(.vjs-progress-control) {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            height: 40px !important;
-            align-items: center !important;
-            padding: 0 10px !important;
-            order: 2;
+        
+        video::-webkit-media-controls-download-button,
+        video::-internal-media-controls-download-button {
+            display: none !important;
         }
-
-        /* Time display */
-        .vjs-current-time {
-            display: block !important;
-            font-size: 14px !important;
-            margin-right: 15px !important;
-            min-width: 50px !important;
-        }
-
-        .vjs-time-divider, .vjs-duration, .vjs-remaining-time-display { display: none !important; }
-
-        /* Button spacing */
-        .vjs-volume-panel {
-            margin-left: auto !important;
-            display: flex !important;
-            align-items: center !important;
-        }
-
-        .vjs-fullscreen-control {
-            display: flex !important;
-            align-items: center !important;
-            margin-left: 10px !important;
-        }
-
-        .vjs-playback-rate {
-            display: flex !important;
-            align-items: center !important;
-            margin-left: 10px !important;
-        }
-
-        /* Icons */
-        .vjs-button > .vjs-icon-placeholder:before {
-            font-size: 22px !important;
-            line-height: 1.8 !important;
-        }
-
-        .vjs-picture-in-picture-control { display: none !important; }
-
-        /* Hide play button in control bar */
-        .vjs-play-control { display: none !important; }
-
-        /* Mobile */
+        
         @media (max-width: 768px) {
-            .vjs-big-play-button {
-                width: 80px !important;
-                height: 80px !important;
-                line-height: 80px !important;
+            marquee {
+                font-size: 14px;
+                padding: 8px;
             }
-            .vjs-big-play-button .vjs-icon-placeholder:before {
-                font-size: 36px !important;
+            
+            .tap-indicator {
+                font-size: 48px;
             }
-            .vjs-current-time {
-                font-size: 12px !important;
+            
+            .tap-indicator.left {
+                left: 30px;
+            }
+            
+            .tap-indicator.right {
+                right: 30px;
             }
         }
     </style>
+    <meta name='dmca-site-verification' content='THBkdGsyeW81ZTBMT3VZNHpteGovWEtoV3h5NENqcDdPa2hsUzZiU0ZZST01' />
 </head>
-<body>
 
-    <!-- Marquee above the video -->
-    <marquee scrollamount="5">{{ file_name }}</marquee>
+<body>
+    <header>
+        <marquee bgcolor="rgba(0,0,0,0.9)">
+            <div id="file-name">{{ file_name }}</div>
+        </marquee>
+    </header>
 
     <div class="container">
-        <div class="video-wrapper" id="player-container">
-            <video
-                id="main-player"
-                class="video-js vjs-fluid"
-                controls
-                preload="auto"
-                playsinline
-                oncontextmenu="return false;">
-                <source src="{{ file_url }}" type="video/mp4">
-            </video>
-        </div>
+        <{{ tag }} 
+            id="player" 
+            class="video-js vjs-default-skin vjs-big-play-centered" 
+            controls 
+            preload="auto"
+            playsinline
+            controlsList="nodownload"
+            oncontextmenu="return false;"
+            crossorigin="anonymous">
+            <source src="{{ file_url }}" type="application/x-mpegURL">
+        </{{ tag }}>
     </div>
 
-    <!-- Video.js Core Script -->
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.12.0/dist/videojs-http-streaming.min.js"></script>
 
-    <script>
-        const player = videojs('main-player', {
-            controlBar: {
-                children: [
-                    'progressControl',
-                    'currentTimeDisplay',
-                    'volumePanel',
-                    'playbackRateMenuButton',
-                    'fullscreenToggle'
-                ]
-            }
-        });
-
-        // --- Tap the middle of the video to toggle play/pause ---
-        player.on('click', function(e) {
-            // Ignore clicks on the control bar and the big button
-            if (e.target.closest('.vjs-control-bar') || e.target.closest('.vjs-big-play-button')) {
-                return;
-            }
-            if (player.paused()) {
-                player.play();
+<script>
+(function() {
+    'use strict';
+    
+    const playerElement = document.getElementById('player');
+    const container = document.querySelector('.container');
+    const source = '{{ file_url }}';
+    const isVideo = playerElement.tagName.toLowerCase() === 'video';
+    
+    let player;
+    let lastTapTime = 0;
+    let lastTapSide = null;
+    let pressTimer;
+    
+    function showTapIndicator(side, text) {
+        const indicator = document.createElement('div');
+        indicator.className = `tap-indicator ${side}`;
+        indicator.textContent = text;
+        container.appendChild(indicator);
+        setTimeout(() => indicator.remove(), 500);
+    }
+    
+    function handleDoubleTap(e) {
+        if (!isVideo) return;
+        
+        const currentTime = Date.now();
+        const tapLength = currentTime - lastTapTime;
+        const rect = playerElement.getBoundingClientRect();
+        const x = e.clientX || (e.touches?.[0]?.clientX);
+        const isLeftSide = x < rect.left + rect.width / 2;
+        
+        if (tapLength < 300 && tapLength > 0 && isLeftSide === lastTapSide) {
+            e.preventDefault();
+            
+            if (isLeftSide) {
+                player.currentTime(Math.max(0, player.currentTime() - 10));
+                showTapIndicator('left', '⏪ 10s');
             } else {
-                player.pause();
+                player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
+                showTapIndicator('right', '10s ⏩');
+            }
+        }
+        
+        lastTapSide = isLeftSide;
+        lastTapTime = currentTime;
+    }
+    
+    const playerOptions = {
+        controls: true,
+        autoplay: false,
+        preload: 'auto',
+        playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+        html5: {
+            vhs: {
+                overrideNative: true,
+                smoothQualityChange: true,
+                bandwidth: 4194304
+            },
+            nativeVideoTracks: false,
+            nativeAudioTracks: false,
+            nativeTextTracks: false
+        }
+    };
+    
+    player = videojs('player', playerOptions);
+    
+    player.ready(function() {
+        playerElement.addEventListener('touchstart', handleDoubleTap, { passive: true });
+        playerElement.addEventListener('click', handleDoubleTap);
+        
+        // Prevent context menu
+        playerElement.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            return false;
+        }, true);
+        
+        // Prevent long-press on mobile
+        playerElement.addEventListener('touchstart', e => {
+            if (e.target.tagName.toLowerCase() === 'video') {
+                pressTimer = setTimeout(() => e.preventDefault(), 500);
             }
         });
-
-        // --- Double tap to seek ---
-        const container = document.getElementById('player-container');
-        let lastTap = 0;
-        container.addEventListener('touchstart', function(e) {
-            const now = Date.now();
-            if (now - lastTap < 300) {
-                const rect = container.getBoundingClientRect();
-                const touchX = e.touches[0].clientX - rect.left;
-                if (touchX < rect.width / 2) {
-                    player.currentTime(player.currentTime() - 10);
-                } else {
-                    player.currentTime(player.currentTime() + 10);
-                }
-                e.preventDefault();
-            }
-            lastTap = now;
-        });
-
-        // --- Error recovery ---
-        player.on('error', function() {
-            setTimeout(() => { player.load(); player.play(); }, 3000);
-        });
-    </script>
+        
+        playerElement.addEventListener('touchend', () => clearTimeout(pressTimer));
+        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    });
+    
+    player.on('error', function() {
+        const error = player.error();
+        if (error?.code === 4) {
+            setTimeout(() => {
+                player.src({ src: source, type: 'application/x-mpegURL' });
+                player.load();
+            }, 3000);
+        }
+    });
+    
+    window.addEventListener('beforeunload', () => player?.dispose());
+    
+})();
+</script>
+    
 </body>
 </html>
