@@ -51,24 +51,40 @@
             aspect-ratio: 16 / 9;
         }
 
-        /* ---------- Player Controls from Code 2 (minus quality button) ---------- */
+        /* ---------- Big Play Button (blank white transparent circle) ---------- */
         .vjs-big-play-button {
+            background-color: rgba(255, 255, 255, 0.45) !important;  /* white semi-transparent */
+            border: none !important;                                    /* no border */
             border-radius: 50% !important;
-            width: 2em !important;
-            height: 2em !important;
-            line-height: 2em !important;
-            border: 0.06666em solid #fff !important;
-            background-color: rgba(43,51,63,0.7) !important;
+            width: 2.5em !important;
+            height: 2.5em !important;
+            line-height: 2.5em !important;
             left: 50% !important;
             top: 50% !important;
             transform: translate(-50%, -50%) !important;
-            margin-top: 0 !important;
-            margin-left: 0 !important;
+            margin: 0 !important;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        /* Remove the play triangle icon → blank circle */
+        .vjs-big-play-button .vjs-icon-placeholder:before {
+            content: none !important;
         }
 
+        /* ---------- Control Bar (Code 2 style, no playToggle) ---------- */
         .vjs-control-bar {
             background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important;
         }
+
+        /* Make all control bar icons and text white */
+        .vjs-control-bar .vjs-icon-placeholder:before,
+        .vjs-control-bar .vjs-control-text,
+        .vjs-current-time,
+        .vjs-time-divider,
+        .vjs-duration,
+        .vjs-playback-rate .vjs-playback-rate-value {
+            color: #ffffff !important;
+        }
+        /* Volume slider and progress bar handles can stay default; icons remain white */
 
         .vjs-tech {
             object-fit: contain;
@@ -130,23 +146,21 @@
                 <source src="{{ file_url }}" type="application/x-mpegURL">
                 <source src="{{ file_url }}" type="video/mp4">
             </video>
-            <!-- No double‑tap icons -->
         </div>
     </div>
 
     <!-- Video.js Core Script -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <!-- HTTP Streaming plugin (needed for HLS) -->
     <script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.12.0/dist/videojs-http-streaming.min.js"></script>
 
     <script>
-        // --- Player Initialisation (no quality button) ---
+        // --- Player Initialisation (playToggle removed) ---
         const player = videojs('main-player', {
             fluid: true,
             playbackRates: [0.5, 1, 1.25, 1.5, 2],
             controlBar: {
                 children: [
-                    'playToggle',
+                    // 'playToggle' removed – big center button handles play/pause
                     'currentTimeDisplay',
                     'timeDivider',
                     'durationDisplay',
@@ -179,13 +193,11 @@
                 const midPoint = rect.width / 2;
 
                 if (touchX < midPoint) {
-                    // Left double tap → seek backward 10s
                     player.currentTime(Math.max(0, player.currentTime() - 10));
                 } else {
-                    // Right double tap → seek forward 10s
                     player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
                 }
-                e.preventDefault(); // Prevent zooming
+                e.preventDefault();
             }
             lastTap = now;
         });
