@@ -8,6 +8,7 @@
     <!-- Video.js CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:400,700">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,14 +20,16 @@
             overflow-x: hidden;
         }
 
-        /* Marquee Header */
+        /* Marquee header – now exactly like Code 2 */
         marquee {
-            font-size: 16px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 12px;
+            font-size: 18px;
+            font-weight: 600;
             color: #fff;
-            border-bottom: 1px solid #222;
-            display: block;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            font-family: 'Delius', serif;
+            width: 100%;
+            z-index: 999;
         }
 
         .container {
@@ -48,47 +51,6 @@
             aspect-ratio: 16 / 9;
         }
 
-        /* Double Tap UI Indicators */
-        .tap-indicator {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 50px;
-            color: rgba(255,255,255,0.8);
-            pointer-events: none;
-            z-index: 10;
-            display: none;
-            text-shadow: 0 0 15px rgba(0,0,0,0.9);
-        }
-        .tap-left { left: 15%; }
-        .tap-right { right: 15%; }
-
-        @keyframes tapEffect {
-            0% { opacity: 0; transform: translateY(-50%) scale(0.8); }
-            50% { opacity: 1; transform: translateY(-50%) scale(1.2); }
-            100% { opacity: 0; transform: translateY(-50%) scale(1); }
-        }
-        .animate-tap { display: block; animation: tapEffect 0.5s ease-out forwards; }
-
-        .file-details {
-            padding: 20px;
-            background: #0a0a0a;
-        }
-
-        .file-details h2 {
-            font-size: 14px;
-            color: #888;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .file-details p {
-            font-size: 18px;
-            color: #fff;
-            word-break: break-all;
-            line-height: 1.4;
-        }
-
         /* Video.js Theme Tweaks */
         .vjs-big-play-button {
             background-color: rgba(0, 123, 255, 0.5) !important;
@@ -99,12 +61,21 @@
             margin-top: -1.25em !important;
             margin-left: -1.25em !important;
         }
+
+        /* Mobile responsive font size */
+        @media (max-width: 768px) {
+            marquee {
+                font-size: 14px;
+                padding: 8px;
+            }
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <marquee scrollamount="6">Playing: {{ file_name }}</marquee>
+        <!-- Marquee with just the file name (no "Playing:" text) -->
+        <marquee scrollamount="6">{{ file_name }}</marquee>
     </header>
 
     <div class="container">
@@ -119,15 +90,10 @@
                 <source src="{{ file_url }}" type="video/mp4">
             </video>
 
-            <!-- Visual feedback for double tap -->
-            <div id="ind-left" class="tap-indicator tap-left">⏪</div>
-            <div id="ind-right" class="tap-indicator tap-right">⏩</div>
+            <!-- Visual feedback indicators removed (no double‑tap icons) -->
         </div>
 
-        <div class="file-details">
-            <h2>File Name</h2>
-            <p>{{ file_name }}</p>
-        </div>
+        <!-- File details block removed (no "file name" heading or black box) -->
     </div>
 
     <!-- Video.js Core Script -->
@@ -150,10 +116,8 @@
             }
         });
 
-        // --- DOUBLE TAP TO SEEK CODE ---
+        // --- DOUBLE TAP TO SEEK (no visual icons) ---
         const container = document.getElementById('player-container');
-        const indLeft = document.getElementById('ind-left');
-        const indRight = document.getElementById('ind-right');
         let lastTap = 0;
 
         container.addEventListener('touchstart', function(e) {
@@ -168,26 +132,16 @@
                 if (touchX < midPoint) {
                     // Double tapped left
                     player.currentTime(Math.max(0, player.currentTime() - 10));
-                    triggerAnimation(indLeft);
                 } else {
                     // Double tapped right
                     player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
-                    triggerAnimation(indRight);
                 }
                 e.preventDefault(); // Prevent zooming
             }
             lastTap = now;
         });
 
-        function triggerAnimation(el) {
-            el.classList.remove('animate-tap');
-            void el.offsetWidth; // Force reflow
-            el.classList.add('animate-tap');
-            setTimeout(() => el.classList.remove('animate-tap'), 500);
-        }
-
         // --- ERROR RECOVERY ---
-        // If the video stops due to network, attempt to reload
         player.on('error', function() {
             setTimeout(() => {
                 player.src({ src: '{{ file_url }}', type: '{{ file_url }}'.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
