@@ -22,30 +22,37 @@
             height: 100vh;
         }
 
-        /* Marquee – now a static bar above the video, no overlap */
+        /* Marquee – static bar above the video */
         marquee {
             font-size: 16px;
             font-weight: 400;
             color: #fff;
             padding: 10px 15px;
             width: 100%;
-            flex-shrink: 0;              /* doesn’t shrink */
-            background: #000;            /* solid background so it doesn’t show through */
+            flex-shrink: 0;
+            background: #000;
         }
 
         .container {
-            flex: 1;                     /* fills remaining height */
+            flex: 1;
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;           /* keeps the video contained */
+            overflow: hidden;
+            position: relative;
         }
 
         .video-wrapper {
             width: 100%;
+            height: 100%;
             position: relative;
-            /* the player will take the height it needs */
+        }
+
+        /* Video player */
+        .video-js {
+            width: 100% !important;
+            height: 100% !important;
         }
 
         /* ----- THE BIG CENTER PLAY BUTTON (off‑white circle) ----- */
@@ -53,70 +60,110 @@
             background-color: #e3e3e3 !important;
             border: none !important;
             border-radius: 50% !important;
-            width: 80px !important;
-            height: 80px !important;
-            line-height: 80px !important;
+            width: 100px !important;
+            height: 100px !important;
+            line-height: 100px !important;
             left: 50% !important;
             top: 50% !important;
             transform: translate(-50%, -50%) !important;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+            z-index: 10 !important;
         }
 
         /* Black triangle icon */
         .vjs-big-play-button .vjs-icon-placeholder:before {
             color: #000 !important;
-            font-size: 40px !important;
+            font-size: 45px !important;
             content: "\f101" !important;
         }
 
-        /* ----- CONTROL BAR LAYOUT (two rows) ----- */
+        /* ----- CONTROL BAR (bottom of video) ----- */
         .vjs-control-bar {
-            background: linear-gradient(transparent, rgba(0,0,0,0.7)) !important;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8)) !important;
             display: flex !important;
-            flex-wrap: wrap !important;
-            height: 80px !important;
-            align-items: center !important;
-            padding: 0 10px !important;
+            flex-direction: column !important;
+            height: auto !important;
+            align-items: stretch !important;
+            padding: 0 !important;
+            position: absolute !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            z-index: 20 !important;
         }
 
-        /* Row 1: Time on left, buttons on right */
-        .vjs-current-time {
-            display: block !important;
-            order: 1;
-            font-size: 16px !important;
-        }
-        .vjs-time-divider, .vjs-duration, .vjs-remaining-time-display { display: none !important; }
-
-        .vjs-volume-panel { order: 2; margin-left: auto !important; }
-        .vjs-fullscreen-control { order: 3; }
-        .vjs-playback-rate { order: 4; }
-
-        /* Row 2: Progress Bar full width */
+        /* Progress bar row (full width) */
         .vjs-progress-control {
-            order: 5;
+            order: 1;
             width: 100% !important;
             height: 30px !important;
-            position: relative;
+            display: flex !important;
+            align-items: center !important;
+            padding: 5px 10px !important;
+            box-sizing: border-box !important;
         }
 
         /* ----- PROGRESS BAR STYLING (white) ----- */
         .video-js .vjs-progress-holder {
-            height: 4px !important;
+            height: 6px !important;
             margin: 0 !important;
             background-color: rgba(255,255,255,0.3) !important;
+            flex: 1;
+            position: relative;
         }
 
         .video-js .vjs-play-progress {
             background-color: #fff !important;
+            height: 6px !important;
         }
 
         /* Circle scrubber */
         .video-js .vjs-play-progress:before {
-            font-size: 18px !important;
+            font-size: 16px !important;
             color: #fff !important;
-            top: -7px !important;
+            top: -5px !important;
             content: "●" !important;
             text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Control buttons row */
+        .vjs-control-bar > div:not(.vjs-progress-control) {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            height: 40px !important;
+            align-items: center !important;
+            padding: 0 10px !important;
+            order: 2;
+        }
+
+        /* Time display */
+        .vjs-current-time {
+            display: block !important;
+            font-size: 14px !important;
+            margin-right: 15px !important;
+            min-width: 50px !important;
+        }
+
+        .vjs-time-divider, .vjs-duration, .vjs-remaining-time-display { display: none !important; }
+
+        /* Button spacing */
+        .vjs-volume-panel {
+            margin-left: auto !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        .vjs-fullscreen-control {
+            display: flex !important;
+            align-items: center !important;
+            margin-left: 10px !important;
+        }
+
+        .vjs-playback-rate {
+            display: flex !important;
+            align-items: center !important;
+            margin-left: 10px !important;
         }
 
         /* Icons */
@@ -127,16 +174,28 @@
 
         .vjs-picture-in-picture-control { display: none !important; }
 
+        /* Hide play button in control bar */
+        .vjs-play-control { display: none !important; }
+
         /* Mobile */
         @media (max-width: 768px) {
-            .vjs-big-play-button { width: 60px !important; height: 60px !important; line-height: 60px !important; }
-            .vjs-big-play-button .vjs-icon-placeholder:before { font-size: 30px !important; }
+            .vjs-big-play-button {
+                width: 80px !important;
+                height: 80px !important;
+                line-height: 80px !important;
+            }
+            .vjs-big-play-button .vjs-icon-placeholder:before {
+                font-size: 36px !important;
+            }
+            .vjs-current-time {
+                font-size: 12px !important;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Marquee now sits above the video, not over it -->
+    <!-- Marquee above the video -->
     <marquee scrollamount="5">{{ file_name }}</marquee>
 
     <div class="container">
@@ -160,18 +219,18 @@
         const player = videojs('main-player', {
             controlBar: {
                 children: [
+                    'progressControl',
                     'currentTimeDisplay',
                     'volumePanel',
-                    'fullscreenToggle',
                     'playbackRateMenuButton',
-                    'progressControl'
+                    'fullscreenToggle'
                 ]
             }
         });
 
-        // --- FIX: Tap the middle of the video to toggle play/pause ---
+        // --- Tap the middle of the video to toggle play/pause ---
         player.on('click', function(e) {
-            // Ignore clicks on the control bar and the big button (it handles itself)
+            // Ignore clicks on the control bar and the big button
             if (e.target.closest('.vjs-control-bar') || e.target.closest('.vjs-big-play-button')) {
                 return;
             }
@@ -182,7 +241,7 @@
             }
         });
 
-        // --- Double tap to seek (unchanged) ---
+        // --- Double tap to seek ---
         const container = document.getElementById('player-container');
         let lastTap = 0;
         container.addEventListener('touchstart', function(e) {
@@ -200,7 +259,7 @@
             lastTap = now;
         });
 
-        // --- Error recovery (unchanged) ---
+        // --- Error recovery ---
         player.on('error', function() {
             setTimeout(() => { player.load(); player.play(); }, 3000);
         });
