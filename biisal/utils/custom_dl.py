@@ -11,10 +11,22 @@ from pyrogram.errors import AuthBytesInvalid
 from biisal.server.exceptions import FIleNotFound
 from pyrogram.file_id import FileId, FileType, ThumbnailSource
 
+
 class ByteStreamer:
     def __init__(self, client: Client):
-        """
-        A custom class to stream files from Telegram with prefetching.
+        """A custom class that holds the cache of a specific client and class functions.
+        attributes:
+            client: the client that the cache is for.
+            cached_file_ids: a dict of cached file IDs.
+            cached_file_properties: a dict of cached file properties.
+        
+        functions:
+            generate_file_properties: returns the properties for a media of a specific message contained in Tuple.
+            generate_media_session: returns the media session for the DC that contains the media file.
+            yield_file: yield a file from telegram servers for streaming.
+            
+        This is a modified version of the <https://github.com/eyaadh/megadlbot_oss/blob/master/mega/telegram/utils/custom_download.py>
+        Thanks to Eyaadh <https://github.com/eyaadh>
         """
         self.clean_timer = 30 * 60
         self.client: Client = client
@@ -22,18 +34,36 @@ class ByteStreamer:
         asyncio.create_task(self.clean_cache())
 
     async def get_file_properties(self, id: int) -> FileId:
+        """
+        Returns the properties of a media of a specific message in a FIleId class.
+        if the properties are cached, then it'll return the cached results.
+        or it'll generate the properties from the Message ID and cache them.
+        """
         if id not in self.cached_file_ids:
             await self.generate_file_properties(id)
+            logging.debug(f"Cached file properties for message with ID {id}")
         return self.cached_file_ids[id]
     
     async def generate_file_properties(self, id: int) -> FileId:
+        """
+        Generates the properties of a media file on a specific message.
+        returns ths properties in a FIleId class.
+        """
         file_id = await get_file_ids(self.client, Var.BIN_CHANNEL, id)
+        logging.debug(f"Generated file ID and Unique ID for message with ID {id}")
         if not file_id:
+            logging.debug(f"Message with ID {id} not found")
             raise FIleNotFound
         self.cached_file_ids[id] = file_id
+        logging.debug(f"Cached media message with ID {id}")
         return self.cached_file_ids[id]
 
     async def generate_media_session(self, client: Client, file_id: FileId) -> Session:
+        """
+        Generates the media session for the DC that contains the media file.
+        This is required for getting the bytes from Telegram servers.
+        """
+
         media_session = client.media_sessions.get(file_id.dc_id, None)
 
         if media_session is None:
@@ -62,6 +92,9 @@ class ByteStreamer:
                         )
                         break
                     except AuthBytesInvalid:
+                        logging.debug(
+                            f"Invalid authorization bytes for DC {file_id.dc_id}"
+                        )
                         continue
                 else:
                     await media_session.stop()
@@ -75,11 +108,20 @@ class ByteStreamer:
                     is_media=True,
                 )
                 await media_session.start()
+            logging.debug(f"Created media session for DC {file_id.dc_id}")
             client.media_sessions[file_id.dc_id] = media_session
+        else:
+            logging.debug(f"Using cached media session for DC {file_id.dc_id}")
         return media_session
 
+
     @staticmethod
-    async def get_location(file_id: FileId):
+    async def get_location(file_id: FileId) -> Union[raw.types.InputPhotoFileLocation,
+                                                     raw.types.InputDocumentFileLocation,
+                                                     raw.types.InputPeerPhotoFileLocation,]:
+        """
+        Returns the file location for the media file.
+        """
         file_type = file_id.file_type
 
         if file_type == FileType.CHAT_PHOTO:
@@ -127,19 +169,19 @@ class ByteStreamer:
         last_part_cut: int,
         part_count: int,
         chunk_size: int,
-    ):
+    ) -> Union[str, None]:
         """
-        Optimized yield_file with background prefetching to stop buffering.
+        Custom generator that yields the bytes of the media file with background prefetching.
         """
         client = self.client
         work_loads[index] += 1
-        
-        # Maxsize 3 means we keep 3 chunks (3MB) ready in the background buffer.
-        # This stops the 'gap' between requesting chunks from Telegram.
+        logging.debug(f"Starting to yielding file with client {index}.")
+
+        # Prefetch Queue: Holds 3 chunks (3MB) in memory to eliminate wait time between chunks
         queue = asyncio.Queue(maxsize=3)
-        
-        # This task runs in the background to fetch data
+
         async def producer():
+            """Background worker to fetch chunks as fast as possible."""
             current_offset = offset
             try:
                 media_session = await self.generate_media_session(client, file_id)
@@ -155,20 +197,20 @@ class ByteStreamer:
                         if isinstance(r, raw.types.upload.File):
                             await queue.put(r.bytes)
                         else:
-                            await queue.put(None)
+                            await queue.put(None) # Signal error/end
                             break
                         current_offset += chunk_size
                     except Exception as e:
-                        logging.error(f"Producer error: {e}")
+                        logging.error(f"Producer error in client {index}: {e}")
                         await queue.put(None)
                         break
-                # Signal completion
+                # End signal
                 await queue.put(None)
             except Exception as e:
-                logging.error(f"Media Session error: {e}")
+                logging.error(f"Media session failed for client {index}: {e}")
                 await queue.put(None)
 
-        # Start the background downloader
+        # Start prefetching in the background
         producer_task = asyncio.create_task(producer())
 
         try:
@@ -188,16 +230,20 @@ class ByteStreamer:
                     yield chunk
                 
                 queue.task_done()
-                
-        except Exception as e:
-            logging.error(f"Yield error: {e}")
-        finally:
-            # Cleanup
-            producer_task.cancel()
-            work_loads[index] -= 1
-            logging.debug(f"Finished yielding file with client {index}.")
 
+        except Exception as e:
+            logging.error(f"Streaming error on client {index}: {e}")
+        finally:
+            # Cleanup: Stop the producer and decrement workload
+            producer_task.cancel()
+            logging.debug(f"Finished yielding file with client {index}.")
+            work_loads[index] -= 1
+
+    
     async def clean_cache(self) -> None:
+        """
+        function to clean the cache to reduce memory usage
+        """
         while True:
             await asyncio.sleep(self.clean_timer)
             self.cached_file_ids.clear()
