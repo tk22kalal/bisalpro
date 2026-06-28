@@ -7,7 +7,6 @@
     <title>{{ file_name }}</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
-    <!-- ORIGINAL Video.js 8.10.0 CSS (keep exactly) -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -44,8 +43,6 @@
         audio.video-js { height: 80px !important; }
 
         .vjs-tech { object-fit: contain; }
-
-        /* ❌ Removed .tap-indicator and @keyframes tapFade completely */
 
         .vjs-control-bar { background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important; }
 
@@ -92,7 +89,6 @@
         </{{ tag }}>
     </div>
 
-    <!-- ORIGINAL Video.js 8.10.0 JS -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.12.0/dist/videojs-http-streaming.min.js"></script>
     <script>
@@ -100,71 +96,45 @@
         'use strict';
 
         const playerElement = document.getElementById('player');
+        const container = document.querySelector('.container');
         const source = '{{ file_url }}';
+        const isVideo = playerElement.tagName.toLowerCase() === 'video';
 
-        const player = videojs('player', {
-            controls: true,
-            autoplay: false,
-            preload: 'auto',
-            fluid: false,
+        let player;
+
+        player = videojs('player', {
+            controls: true, autoplay: false, preload: 'auto', fluid: false,
             playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
             controlBar: {
-                children: [
-                    'playToggle',
-                    'currentTimeDisplay',
-                    'timeDivider',
-                    'durationDisplay',
-                    'progressControl',
-                    'volumePanel',
-                    'playbackRateMenuButton',   // ← no qualityButton
-                    'pictureInPictureToggle',
-                    'fullscreenToggle'
-                ]
+                children: ['playToggle','currentTimeDisplay','timeDivider','durationDisplay',
+                    'progressControl','volumePanel','playbackRateMenuButton',
+                    'pictureInPictureToggle','fullscreenToggle']
             },
             html5: {
                 vhs: {
-                    overrideNative: true,
-                    enableLowInitialPlaylist: true,
-                    smoothQualityChange: true,
-                    useBandwidthFromLocalStorage: true,
-                    bandwidth: 4194304,
-                    handleManifestRedirects: true,
-                    limitRenditionByPlayerDimensions: false,
-                    useDevicePixelRatio: true
+                    overrideNative: true, enableLowInitialPlaylist: true,
+                    smoothQualityChange: true, useBandwidthFromLocalStorage: true,
+                    bandwidth: 4194304, handleManifestRedirects: true,
+                    limitRenditionByPlayerDimensions: false, useDevicePixelRatio: true
                 },
-                nativeVideoTracks: false,
-                nativeAudioTracks: false,
-                nativeTextTracks: false
+                nativeVideoTracks: false, nativeAudioTracks: false, nativeTextTracks: false
             }
         });
 
-        // disable right‑click / download
         player.ready(function() {
-            playerElement.addEventListener('contextmenu', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }, true);
+            // Double-tap and quality code removed
         });
 
-        // auto‑reload on error
         player.on('error', function() {
-            var err = player.error();
+            const err = player.error();
             if (err && err.code === 4) {
-                setTimeout(function() {
-                    player.src({ src: source, type: 'application/x-mpegURL' });
-                    player.load();
-                }, 3000);
+                setTimeout(() => { player.src({ src: source, type: 'application/x-mpegURL' }); player.load(); }, 3000);
             }
         });
 
-        // cleanup on leave
-        window.addEventListener('beforeunload', function() {
-            if (player) player.dispose();
-        });
+        window.addEventListener('beforeunload', () => { if (player) player.dispose(); });
 
-        // hide native download button
-        var style = document.createElement('style');
+        const style = document.createElement('style');
         style.textContent = `
             .video-js *[download] { display: none !important; }
             video::-webkit-media-controls-download-button { display: none !important; }
@@ -172,6 +142,17 @@
             video::-internal-media-controls-download-button { display: none !important; }
         `;
         document.head.appendChild(style);
+
+        playerElement.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
+        let pressTimer;
+        playerElement.addEventListener('touchstart', e => {
+            if (e.target.tagName.toLowerCase() === 'video')
+                pressTimer = setTimeout(() => { e.preventDefault(); e.stopPropagation(); }, 500);
+        });
+        playerElement.addEventListener('touchend',  () => clearTimeout(pressTimer));
+        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
     })();
     </script>
 </body>
