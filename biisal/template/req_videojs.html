@@ -8,6 +8,7 @@
     <meta name="monetag" content="f3ecc71ccb639ccf66d9d0dee93d3e7a">
     <title>{{ file_name }}</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Delius">
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     
     <style>
@@ -29,6 +30,7 @@
             color: #fff;
             background: rgba(0, 0, 0, 0.9);
             padding: 10px;
+            font-family: 'Delius', serif;
             width: 100%;
             z-index: 999;
         }
@@ -123,12 +125,11 @@
             line-height: 2;
         }
         
-        a[download], .vjs-control[download] {
+        a[download] {
             display: none !important;
         }
         
-        video::-webkit-media-controls-download-button,
-        video::-internal-media-controls-download-button {
+        .vjs-control[download] {
             display: none !important;
         }
         
@@ -151,7 +152,7 @@
             }
         }
     </style>
-    <meta name='dmca-site-verification' content='THBkdGsyeW81ZTBMT3VZNHpteGovWEtoV3h5NENqcDdPa2hsUzZiU0ZZST01' />
+    <meta name='dmca-site-verification' content='THBkdGsyeW85ZTBMT3VZNHpteGovWEtoV3h5NENqcDdPa2hsUzZiU0ZZST01' />
 </head>
 
 <body>
@@ -190,51 +191,90 @@
     let player;
     let lastTapTime = 0;
     let lastTapSide = null;
-    let pressTimer;
     
+    // Optimized tap indicator with requestAnimationFrame
     function showTapIndicator(side, text) {
         const indicator = document.createElement('div');
         indicator.className = `tap-indicator ${side}`;
         indicator.textContent = text;
         container.appendChild(indicator);
-        setTimeout(() => indicator.remove(), 500);
+        
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                if (indicator.parentNode) {
+                    indicator.remove();
+                }
+            }, 500);
+        });
     }
     
+    // Optimized double-tap handler with debouncing
+    let tapTimeout;
     function handleDoubleTap(e) {
         if (!isVideo) return;
         
         const currentTime = Date.now();
         const tapLength = currentTime - lastTapTime;
         const rect = playerElement.getBoundingClientRect();
-        const x = e.clientX || (e.touches?.[0]?.clientX);
-        const isLeftSide = x < rect.left + rect.width / 2;
+        const x = e.clientX || (e.touches && e.touches[0].clientX);
+        const isLeftSide = x < rect.left + (rect.width / 2);
+        
+        clearTimeout(tapTimeout);
         
         if (tapLength < 300 && tapLength > 0 && isLeftSide === lastTapSide) {
             e.preventDefault();
+            e.stopPropagation();
             
-            if (isLeftSide) {
-                player.currentTime(Math.max(0, player.currentTime() - 10));
-                showTapIndicator('left', '⏪ 10s');
-            } else {
-                player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
-                showTapIndicator('right', '10s ⏩');
-            }
+            const newTime = isLeftSide 
+                ? Math.max(0, player.currentTime() - 10)
+                : Math.min(player.duration(), player.currentTime() + 10);
+            
+            player.currentTime(newTime);
+            showTapIndicator(isLeftSide ? 'left' : 'right', isLeftSide ? '⏪ 10s' : '10s ⏩');
+            
+            lastTapTime = 0;
+            lastTapSide = null;
+        } else {
+            lastTapTime = currentTime;
+            lastTapSide = isLeftSide;
+            
+            tapTimeout = setTimeout(() => {
+                lastTapTime = 0;
+                lastTapSide = null;
+            }, 500);
         }
-        
-        lastTapSide = isLeftSide;
-        lastTapTime = currentTime;
     }
     
+    // Simplified player options for better performance
     const playerOptions = {
         controls: true,
         autoplay: false,
         preload: 'auto',
+        fluid: false,
         playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+        controlBar: {
+            children: [
+                'playToggle',
+                'currentTimeDisplay',
+                'timeDivider',
+                'durationDisplay',
+                'progressControl',
+                'volumePanel',
+                'playbackRateMenuButton',
+                'pictureInPictureToggle',
+                'fullscreenToggle'
+            ]
+        },
         html5: {
             vhs: {
                 overrideNative: true,
+                enableLowInitialPlaylist: true,
                 smoothQualityChange: true,
-                bandwidth: 4194304
+                useBandwidthFromLocalStorage: true,
+                bandwidth: 4194304,
+                handleManifestRedirects: true,
+                limitRenditionByPlayerDimensions: false,
+                useDevicePixelRatio: true
             },
             nativeVideoTracks: false,
             nativeAudioTracks: false,
@@ -242,32 +282,28 @@
         }
     };
     
+    // Initialize player
     player = videojs('player', playerOptions);
     
     player.ready(function() {
+        const self = this;
+        
+        // Add event listeners with passive flag for better performance
         playerElement.addEventListener('touchstart', handleDoubleTap, { passive: true });
         playerElement.addEventListener('click', handleDoubleTap);
         
         // Prevent context menu
-        playerElement.addEventListener('contextmenu', e => {
+        playerElement.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             return false;
         }, true);
-        
-        // Prevent long-press on mobile
-        playerElement.addEventListener('touchstart', e => {
-            if (e.target.tagName.toLowerCase() === 'video') {
-                pressTimer = setTimeout(() => e.preventDefault(), 500);
-            }
-        });
-        
-        playerElement.addEventListener('touchend', () => clearTimeout(pressTimer));
-        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
     });
     
+    // Error handling
     player.on('error', function() {
         const error = player.error();
-        if (error?.code === 4) {
+        if (error && error.code === 4) {
             setTimeout(() => {
                 player.src({ src: source, type: 'application/x-mpegURL' });
                 player.load();
@@ -275,8 +311,21 @@
         }
     });
     
-    window.addEventListener('beforeunload', () => player?.dispose());
+    // Cleanup on unload
+    window.addEventListener('beforeunload', () => {
+        if (player) {
+            player.dispose();
+        }
+    });
     
+    // Hide download controls with minimal CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        .video-js *[download] { display: none !important; }
+        .vjs-control-bar a[download] { display: none !important; }
+        video::-webkit-media-controls-download-button { display: none !important; }
+    `;
+    document.head.appendChild(style);
 })();
 </script>
     
