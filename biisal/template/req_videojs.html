@@ -8,11 +8,23 @@
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; font-family: 'Raleway', sans-serif; overflow-x: hidden; }
+        body { 
+            background: #000; 
+            font-family: 'Raleway', sans-serif; 
+            overflow-x: hidden; 
+            /* Prevent text selection and long-press menus globally */
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none;
+            user-select: none;
+        }
         marquee { font-size: 18px; font-weight: 600; color: #fff; background: rgba(0,0,0,0.9); padding: 10px; font-family: 'Delius', serif; width: 100%; }
         .container { width: 100%; background: #000; position: relative; }
         .video-js { width: 100% !important; height: auto !important; aspect-ratio: 16 / 9; }
-        audio.video-js { height: 80px !important; }
+        
+        /* HIDE NATIVE DOWNLOAD CONTROLS */
+        video::-webkit-media-controls-download-button { display: none !important; }
+        video::-webkit-media-controls-enclosure { overflow: hidden !important; }
+
         .vjs-tech { object-fit: contain; }
         .tap-indicator { position: absolute; top: 50%; transform: translateY(-50%); font-size: 60px; color: rgba(255,255,255,0.95); pointer-events: none; z-index: 10000; animation: tapFade 0.5s ease-out; text-shadow: 0 3px 15px rgba(0,0,0,0.9); font-weight: bold; }
         .tap-indicator.left  { left: 50px; }
@@ -28,14 +40,19 @@
     <header><marquee><div id="file-name">{{ file_name }}</div></marquee></header>
 
     <div class="container">
-        <{{ tag }} id="player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="metadata" playsinline crossorigin="anonymous">
+        <{{ tag }} id="player" 
+            class="video-js vjs-default-skin vjs-big-play-centered" 
+            controls 
+            preload="metadata" 
+            playsinline 
+            controlsList="nodownload" 
+            oncontextmenu="return false;"
+            crossorigin="anonymous">
             <source src="{{ file_url }}" type="application/x-mpegURL">
         </{{ tag }}>
     </div>
 
-    <!-- Video.js Core -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <!-- Essential Plugin for Quality Switching -->
     <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@4.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
     <script>
@@ -57,22 +74,16 @@
                 const items = [];
                 const levels = this.player().qualityLevels();
                 if (!levels) return items;
-
                 const MenuItem = videojs.getComponent('MenuItem');
                 items.push(new MenuItem(this.player(), { label: 'Auto', selected: true, selectable: true }));
-
                 const heights = [];
                 for (let i = 0; i < levels.length; i++) {
-                    if (levels[i].height && !heights.includes(levels[i].height)) {
-                        heights.push(levels[i].height);
-                    }
+                    if (levels[i].height && !heights.includes(levels[i].height)) heights.push(levels[i].height);
                 }
                 heights.sort((a, b) => b - a).forEach(h => {
                     const item = new MenuItem(this.player(), { label: h + 'p', selectable: true });
                     item.on('click', () => {
-                        for (let i = 0; i < levels.length; i++) {
-                            levels[i].enabled = (levels[i].height === h);
-                        }
+                        for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === h);
                     });
                     items.push(item);
                 });
@@ -83,6 +94,7 @@
 
         const player = videojs('player', {
             playbackRates: [0.5, 1, 1.5, 2],
+            nativeControlsForTouch: false, // Forces custom UI on mobile to hide native download buttons
             controlBar: {
                 children: ['playToggle', 'progressControl', 'volumePanel', 'qualityButton', 'playbackRateMenuButton', 'fullscreenToggle']
             },
@@ -91,22 +103,28 @@
             }
         });
 
-        // Double Tap to Seek
+        // DISABLE LONG PRESS & CONTEXT MENU
+        playerElement.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
+        
+        let pressTimer;
+        playerElement.addEventListener('touchstart', e => {
+            // If user holds for 500ms, cancel the action to prevent browser popup
+            pressTimer = setTimeout(() => { e.preventDefault(); }, 500);
+        }, { passive: false });
+
+        playerElement.addEventListener('touchend',  () => clearTimeout(pressTimer));
+        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+        // DOUBLE TAP TO SEEK (10s)
         function handleTap(e) {
             if (!isVideo) return;
             const now = Date.now();
             const rect = playerElement.getBoundingClientRect();
             const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
             const isLeft = x < rect.width / 2;
-
             if (now - lastTapTime < 300 && isLeft === lastTapSide) {
-                if (isLeft) {
-                    player.currentTime(Math.max(0, player.currentTime() - 10));
-                    showIndicator('left', '⏪ 10s');
-                } else {
-                    player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
-                    showIndicator('right', '10s ⏩');
-                }
+                if (isLeft) { player.currentTime(Math.max(0, player.currentTime() - 10)); showIndicator('left', '⏪ 10s'); }
+                else { player.currentTime(Math.min(player.duration(), player.currentTime() + 10)); showIndicator('right', '10s ⏩'); }
             }
             lastTapTime = now; lastTapSide = isLeft;
         }
@@ -123,7 +141,6 @@
             playerElement.addEventListener('touchstart', handleTap, { passive: true });
             playerElement.addEventListener('click', handleTap);
         });
-
     })();
     </script>
 </body>
