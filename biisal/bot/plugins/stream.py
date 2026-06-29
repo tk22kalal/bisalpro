@@ -251,40 +251,112 @@ async def process_message(msg, json_output, skipped_messages, folder_name=None, 
 
 
 def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> str:
+    """
+    Generate a complete lecture page HTML that loads lectures from a JSON file.
+    The page assumes the repository root contains the required CSS/JS files.
+    """
+    # Calculate depth to repo root (owner/repo is at site root for GitHub Pages)
     parts = [p for p in github_dest_folder.strip('/').split('/') if p]
-    depth = max(len(parts) - 2, 0)
+    depth = max(len(parts) - 2, 0)   # subtract owner & repo, then count sub‑folders
     prefix = '../' * depth if depth > 0 else './'
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lectures</title>
-  <link rel="stylesheet" href="{prefix}styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lectures</title>
+    <link rel="stylesheet" href="{prefix}styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Inline fallback styles */
+        #lectureList {{ padding: 20px; font-family: Arial, sans-serif; }}
+        .lecture-card {{
+            background: #1e1e1e;
+            border-radius: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }}
+        .lecture-card h3 {{ margin: 0 0 10px 0; color: #ffffff; }}
+        .btn-group a {{
+            display: inline-block;
+            margin: 5px 10px 5px 0;
+            padding: 8px 16px;
+            background: #3a3a3a;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }}
+        .btn-group a:hover {{ background: #4a4a4a; }}
+        .stream-btn {{ background: #0078d4 !important; }}
+        .download-btn {{ background: #107c10 !important; }}
+    </style>
 </head>
 <body>
-  <div id="lectureList"><p>Loading...</p></div>
-  <script src="{prefix}access-control.js"></script>
-  <script src="{prefix}block.js"></script>
-  <script src="{prefix}error-handler/link-checker.js"></script>
-  <script>
-    fetch('{json_filename}')
-      .then(r => r.json())
-      .then(data => {{
-        const list = document.getElementById('lectureList');
-        list.innerHTML = '';
-        (data.lectures || []).forEach(l => {{
-          const d = document.createElement('div');
-          d.innerHTML = '<h3>' + l.title + '</h3>' +
-            (l.streamingUrl ? '<a href="' + l.streamingUrl + '">Stream</a> ' : '') +
-            (l.downloadUrl ? '<a href="' + l.downloadUrl + '">Download</a>' : '');
-          list.appendChild(d);
-        }});
-      }});
-  </script>
-  <script src="{prefix}stream-player-utils.js"></script>
-  <script src="{prefix}theme.js"></script>
+    <div id="lectureList">
+        <p style="text-align:center;">Loading lectures...</p>
+    </div>
+
+    <!-- External libraries -->
+    <script src="{prefix}access-control.js"></script>
+    <script src="{prefix}block.js"></script>
+    <script src="{prefix}error-handler/link-checker.js"></script>
+    <script>
+        // Fetch lecture data from the JSON file located in the same folder
+        fetch('{json_filename}')
+            .then(response => {{
+                if (!response.ok) throw new Error('JSON not found');
+                return response.json();
+            }})
+            .then(data => {{
+                const list = document.getElementById('lectureList');
+                list.innerHTML = '';
+                const lectures = data.lectures || [];
+
+                if (lectures.length === 0) {{
+                    list.innerHTML = '<p>No lectures available.</p>';
+                    return;
+                }}
+
+                lectures.forEach(l => {{
+                    const card = document.createElement('div');
+                    card.className = 'lecture-card';
+                    let html = '<h3>' + l.title + '</h3>';
+                    html += '<div class="btn-group">';
+
+                    // Streaming URL (prefer main domain, fallback to x)
+                    const streamUrl = l.streamingUrl || l.streamingUrlx || '';
+                    if (streamUrl) {{
+                        html += '<a href="' + streamUrl + '" class="stream-btn" target="_blank">' +
+                                '<i class="fas fa-play"></i> Stream</a>';
+                    }}
+
+                    // Download URL (prefer main domain, fallback to x)
+                    const downloadUrl = l.downloadUrl || l.downloadUrlx || '';
+                    if (downloadUrl) {{
+                        html += '<a href="' + downloadUrl + '" class="download-btn" target="_blank">' +
+                                '<i class="fas fa-download"></i> Download</a>';
+                    }}
+
+                    // If no links at all
+                    if (!streamUrl && !downloadUrl) {{
+                        html += '<span style="color:#ff4444;">No links available</span>';
+                    }}
+
+                    html += '</div>';
+                    card.innerHTML = html;
+                    list.appendChild(card);
+                }});
+            }})
+            .catch(error => {{
+                document.getElementById('lectureList').innerHTML =
+                    '<p style="color:#ff4444;">Failed to load lectures: ' + error.message + '</p>';
+            }});
+    </script>
+    <script src="{prefix}stream-player-utils.js"></script>
+    <script src="{prefix}theme.js"></script>
 </body>
 </html>"""
 
