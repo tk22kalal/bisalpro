@@ -100,9 +100,9 @@
 
         .dm-btn:hover   { opacity: 0.85; transform: translateY(-1px); }
         .dm-btn:active  { transform: scale(0.97); }
-        .btn-direct     { background: linear-gradient(135deg, #2c5282, #1a365d); }
-        .btn-adm        { background: linear-gradient(135deg, #276749, #1c4532); }
-        .btn-idm        { background: linear-gradient(135deg, #744210, #532a00); }
+        .btn-direct     { background: #2c5282; }
+        .btn-adm        { background: #2c5282; }
+        .btn-idm        { background: #2c5282); }
 
         .dm-label {
             font-size: 12px;
@@ -162,10 +162,6 @@
             <button type="button" class="player-btn" id="videojsBtn" onclick="generateStream('videojs')" aria-label="Stream ANDROID">ANDROID</button>
         </div>
 
-        <div>
-            <button type="button" class="download-btn" id="downloadBtn" onclick="startDownload()" aria-label="Download">DOWNLOAD</button>
-        </div>
-
         <!-- Three download manager buttons (shown after link is generated) -->
         <div class="dm-buttons" id="dmButtons">
             <a id="btnDirect" class="dm-btn btn-direct" href="#" download>
@@ -187,7 +183,7 @@
                 IDM
             </a>
         </div>
-        <p class="dm-label" id="dmLabel"></p>
+        
 
         <div class="loading">
             <div class="spinner"></div>
