@@ -251,112 +251,498 @@ async def process_message(msg, json_output, skipped_messages, folder_name=None, 
 
 
 def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> str:
+    """Generate the lecture HTML page with dynamically calculated relative paths.
+
+    Depth rule:
+      github_dest_folder = "owner/repo/user/path/parts"
+      The HTML sits inside that folder, so to reach the repo root on GitHub Pages
+      we need (number of user path parts) levels of '../'.
+      We strip the first two components (owner + repo) to get the user sub-folders.
+
+    Examples:
+      owner/repo/1234xxx              → depth 1  → ../
+      owner/repo/1234xxx/marrow       → depth 2  → ../../
+      owner/repo/1234xxx/marrow/anat  → depth 3  → ../../../
     """
-    Generate a complete lecture page HTML that loads lectures from a JSON file.
-    The page assumes the repository root contains the required CSS/JS files.
-    """
-    # Calculate depth to repo root (owner/repo is at site root for GitHub Pages)
     parts = [p for p in github_dest_folder.strip('/').split('/') if p]
-    depth = max(len(parts) - 2, 0)   # subtract owner & repo, then count sub‑folders
+    depth = max(len(parts) - 2, 0)   # subtract owner & repo, count only sub-folders
     prefix = '../' * depth if depth > 0 else './'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lectures</title>
-    <link rel="stylesheet" href="{prefix}styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        /* Inline fallback styles */
-        #lectureList {{ padding: 20px; font-family: Arial, sans-serif; }}
-        .lecture-card {{
-            background: #1e1e1e;
-            border-radius: 10px;
-            margin: 15px 0;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }}
-        .lecture-card h3 {{ margin: 0 0 10px 0; color: #ffffff; }}
-        .btn-group a {{
-            display: inline-block;
-            margin: 5px 10px 5px 0;
-            padding: 8px 16px;
-            background: #3a3a3a;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }}
-        .btn-group a:hover {{ background: #4a4a4a; }}
-        .stream-btn {{ background: #0078d4 !important; }}
-        .download-btn {{ background: #107c10 !important; }}
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lectures - NEXTPULSE | NEET PG Preparation</title>
+  <meta name="description" content="Access comprehensive video lectures. Expert faculty for NEET PG preparation.">
+  <meta name="keywords" content="NEET PG, medical lectures, video lectures">
+  <link rel="stylesheet" href="{prefix}styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    .completion-toggle {{
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      cursor: pointer;
+      z-index: 10;
+    }}
+
+    .completion-circle {{
+      width: 32px;
+      height: 32px;
+      border: 2px solid #e2e8f0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }}
+
+    .completion-circle:hover {{
+      border-color: #4299e1;
+      transform: scale(1.05);
+    }}
+
+    .completion-circle.completed {{
+      background: #48bb78;
+      border-color: #48bb78;
+    }}
+
+    .completion-circle .fas.fa-check {{
+      color: white;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }}
+
+    .completion-circle .fas.fa-check.visible {{
+      opacity: 1;
+    }}
+
+    .lecture-card {{
+      position: relative;
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+    }}
+
+    .lecture-card:hover {{
+      transform: translateY(-3px);
+    }}
+
+    .lecture-card h3 {{
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #2c3e50;
+    }}
+
+    .video-popup {{
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }}
+
+    .video-popup-content {{
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow: auto;
+      position: relative;
+      padding: 20px;
+    }}
+
+    .refresh-popup {{
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      background: white;
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+      cursor: pointer;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }}
+
+    .refresh-popup:hover {{
+      background: #f0f0f0;
+      transform: scale(1.1);
+    }}
+
+    .close-popup {{
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: white;
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      font-size: 20px;
+      cursor: pointer;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }}
+
+    .close-popup:hover {{
+      background: #f0f0f0;
+      transform: scale(1.1);
+    }}
+
+    .video-title {{
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #2c3e50;
+    }}
+
+    .iframe-container {{
+      position: relative;
+      width: 100%;
+      height: 0;
+      padding-bottom: 56.25%;
+    }}
+
+    .iframe-container iframe {{
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 4px;
+    }}
+
+    .button-container {{
+      display: flex;
+      gap: 10px;
+    }}
+
+    .stream-button, .download-button {{
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background-color 0.2s;
+    }}
+
+    .stream-button {{
+      background-color: #3498db;
+      color: white;
+    }}
+
+    .stream-button:hover {{
+      background-color: #2980b9;
+    }}
+
+    .download-button {{
+      background-color: #2ecc71;
+      color: white;
+    }}
+
+    .download-button:hover {{
+      background-color: #27ae60;
+    }}
+  </style>
+  <script src="{prefix}access-control.js"></script>
+  <script src="{prefix}block.js"></script>
+  <script src="{prefix}error-handler/link-checker.js"></script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5920367457745298"
+     crossorigin="anonymous"></script>
 </head>
 <body>
-    <div id="lectureList">
-        <p style="text-align:center;">Loading lectures...</p>
+<script>
+  if (!accessControl.initProtectedPage()) {{
+    throw new Error('Access denied - redirecting to index.html');
+  }}
+</script>
+  <header>
+    <div class="header-content">
+      <button onclick="history.back()" style="position: fixed; top: 20px; left: 20px; background: transparent; color: white; border: none; padding: 10px; cursor: pointer; z-index: 1001; font-size: 20px;">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <div class="search-bar">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search lectures..." id="searchInput">
+      </div>
     </div>
+  </header>
+  <main>
+    <div class="lecture-list" id="lectureList">
+      <p>Loading lectures...</p>
+    </div>
+  </main>
 
-    <!-- External libraries -->
-    <script src="{prefix}access-control.js"></script>
-    <script src="{prefix}block.js"></script>
-    <script src="{prefix}error-handler/link-checker.js"></script>
-    <script>
-        // Fetch lecture data from the JSON file located in the same folder
-        fetch('{json_filename}')
-            .then(response => {{
-                if (!response.ok) throw new Error('JSON not found');
-                return response.json();
-            }})
-            .then(data => {{
-                const list = document.getElementById('lectureList');
-                list.innerHTML = '';
-                const lectures = data.lectures || [];
+  <script>
+    let lecturesData = [];
 
-                if (lectures.length === 0) {{
-                    list.innerHTML = '<p>No lectures available.</p>';
-                    return;
-                }}
+    class LectureCompletion {{
+      constructor() {{
+        this.storageKey = 'lectureCompletions';
+      }}
 
-                lectures.forEach(l => {{
-                    const card = document.createElement('div');
-                    card.className = 'lecture-card';
-                    let html = '<h3>' + l.title + '</h3>';
-                    html += '<div class="btn-group">';
+      isCompleted(platform, subject, lectureTitle) {{
+        const completions = this.getCompletions();
+        const key = `${{platform}}-${{subject}}-${{lectureTitle}}`;
+        return completions[key] || false;
+      }}
 
-                    // Streaming URL (prefer main domain, fallback to x)
-                    const streamUrl = l.streamingUrl || l.streamingUrlx || '';
-                    if (streamUrl) {{
-                        html += '<a href="' + streamUrl + '" class="stream-btn" target="_blank">' +
-                                '<i class="fas fa-play"></i> Stream</a>';
-                    }}
+      toggleCompletion(platform, subject, lectureTitle) {{
+        const completions = this.getCompletions();
+        const key = `${{platform}}-${{subject}}-${{lectureTitle}}`;
+        completions[key] = !completions[key];
+        this.saveCompletions(completions);
+        return completions[key];
+      }}
 
-                    // Download URL (prefer main domain, fallback to x)
-                    const downloadUrl = l.downloadUrl || l.downloadUrlx || '';
-                    if (downloadUrl) {{
-                        html += '<a href="' + downloadUrl + '" class="download-btn" target="_blank">' +
-                                '<i class="fas fa-download"></i> Download</a>';
-                    }}
+      getCompletions() {{
+        try {{
+          const stored = localStorage.getItem(this.storageKey);
+          return stored ? JSON.parse(stored) : {{}};
+        }} catch (error) {{
+          console.error('Error reading completions from localStorage:', error);
+          return {{}};
+        }}
+      }}
 
-                    // If no links at all
-                    if (!streamUrl && !downloadUrl) {{
-                        html += '<span style="color:#ff4444;">No links available</span>';
-                    }}
+      saveCompletions(completions) {{
+        try {{
+          localStorage.setItem(this.storageKey, JSON.stringify(completions));
+        }} catch (error) {{
+          console.error('Error saving completions to localStorage:', error);
+        }}
+      }}
 
-                    html += '</div>';
-                    card.innerHTML = html;
-                    list.appendChild(card);
-                }});
-            }})
-            .catch(error => {{
-                document.getElementById('lectureList').innerHTML =
-                    '<p style="color:#ff4444;">Failed to load lectures: ' + error.message + '</p>';
-            }});
-    </script>
-    <script src="{prefix}stream-player-utils.js"></script>
-    <script src="{prefix}theme.js"></script>
+      createCompletionToggle(platform, subject, lectureTitle) {{
+        const isCompleted = this.isCompleted(platform, subject, lectureTitle);
+
+        const toggle = document.createElement('div');
+        toggle.className = 'completion-toggle';
+        toggle.innerHTML = `
+          <div class="completion-circle ${{isCompleted ? 'completed' : ''}}">
+            <i class="fas fa-check ${{isCompleted ? 'visible' : ''}}"></i>
+          </div>
+        `;
+
+        toggle.onclick = (e) => {{
+          e.stopPropagation();
+          const newStatus = this.toggleCompletion(platform, subject, lectureTitle);
+          const circle = toggle.querySelector('.completion-circle');
+          const checkIcon = toggle.querySelector('.fas.fa-check');
+
+          if (newStatus) {{
+            circle.classList.add('completed');
+            checkIcon.classList.add('visible');
+          }} else {{
+            circle.classList.remove('completed');
+            checkIcon.classList.remove('visible');
+          }}
+        }};
+
+        return toggle;
+      }}
+    }}
+
+    const completionTracker = new LectureCompletion();
+
+    async function loadLectures() {{
+      console.log('Starting to load lectures...');
+      try {{
+        console.log('Fetching from {json_filename}...');
+        const response = await fetch('{json_filename}');
+        console.log('Fetch response status:', response.status, response.statusText);
+
+        if (!response.ok) {{
+          throw new Error(`HTTP error! status: ${{response.status}}`);
+        }}
+
+        const data = await response.json();
+        console.log('JSON data received:', data);
+
+        lecturesData = data.lectures || [];
+        console.log('Loaded lectures from JSON:', lecturesData.length, 'lectures');
+
+        if (lecturesData.length > 0) {{
+          renderLectures(lecturesData);
+        }} else {{
+          console.log('No lectures found in JSON');
+          document.getElementById('lectureList').innerHTML = '<p>No lectures available.</p>';
+        }}
+      }} catch (error) {{
+        console.error('Error loading lectures:', error);
+        document.getElementById('lectureList').innerHTML =
+          '<p style="color:red;">Failed to load lectures: ' + error.message + '</p>';
+      }}
+    }}
+
+    function escapeHtml(text) {{
+      const map = {{
+        '&': '&amp;', '<': '&lt;', '>': '&gt;',
+        '"': '&quot;', "'": '&#039;', '\\\\': '&#92;'
+      }};
+      return text.replace(/[&<>"'\\\\]/g, m => map[m]);
+    }}
+
+    function renderLectures(lectures) {{
+      console.log('Rendering lectures:', lectures.length);
+      const lectureList = document.getElementById('lectureList');
+
+      if (!lectureList) {{
+        console.error('lectureList element not found!');
+        return;
+      }}
+
+      lectureList.innerHTML = '';
+
+      if (lectures.length === 0) {{
+        lectureList.innerHTML = '<p>No lectures available.</p>';
+        return;
+      }}
+
+      lectures.forEach((lecture, index) => {{
+        console.log(`Rendering lecture ${{index + 1}}:`, lecture.title);
+        const lectureCard = document.createElement('div');
+        lectureCard.className = 'lecture-card';
+
+        const titleElement = document.createElement('h3');
+        titleElement.textContent = lecture.title;
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'button-container';
+
+        const openButton = document.createElement('button');
+        openButton.className = 'open-button';
+        openButton.innerHTML = '<i class="fas fa-play-circle"></i> Open';
+
+        openButton.addEventListener('click', function() {{
+          openStreamPlayer(
+            lecture.streamingUrl || lecture.streamingUrlx || '',
+            lecture.downloadUrl || lecture.downloadUrlx || lecture.streamingUrl || '',
+            lecture.title
+          );
+        }});
+
+        buttonContainer.appendChild(openButton);
+        lectureCard.appendChild(titleElement);
+        lectureCard.appendChild(buttonContainer);
+
+        const completionToggle = completionTracker.createCompletionToggle('marrow', 'subject', lecture.title);
+        lectureCard.appendChild(completionToggle);
+
+        lectureList.appendChild(lectureCard);
+      }});
+
+      console.log('Finished rendering all lectures');
+    }}
+
+    function openVideo(title, url) {{
+      const popup = document.createElement('div');
+      popup.className = 'video-popup';
+      popup.innerHTML = `
+        <div class="video-popup-content">
+          <button class="close-popup" onclick="closeVideo(this)">&times;</button>
+          <h2 class="video-title">${{title}}</h2>
+          <div class="iframe-container">
+            <iframe src="${{url}}" allowfullscreen></iframe>
+          </div>
+        </div>
+      `;
+
+      popup.onclick = function(e) {{
+        if (e.target === popup) {{
+          closeVideo(popup.querySelector('.close-popup'));
+        }}
+      }};
+
+      document.body.appendChild(popup);
+    }}
+
+    function closeVideo(button) {{
+      const popup = button.closest('.video-popup');
+      document.body.removeChild(popup);
+    }}
+
+    function openStreamPlayer(streamUrl, downloadUrl, title) {{
+      if (!streamUrl) {{
+        alert('Stream URL not available');
+        return;
+      }}
+
+      const sanitizedTitle = (title || 'Lecture Video').trim();
+
+      const params = new URLSearchParams({{
+        stream: streamUrl,
+        title: sanitizedTitle
+      }});
+
+      if (downloadUrl) {{
+        params.append('download', downloadUrl);
+      }}
+
+      const currentPath = window.location.pathname;
+      const pathParts = currentPath.split('/').filter(p => p && !p.includes('.html'));
+
+      const isGitHubPages = window.location.hostname.includes('github.io');
+
+      let streamPlayerUrl;
+      if (isGitHubPages && pathParts.length > 0) {{
+        const repoName = pathParts[0];
+        streamPlayerUrl = `/${{repoName}}/stream-player.html?${{params.toString()}}`;
+      }} else {{
+        streamPlayerUrl = `/stream-player.html?${{params.toString()}}`;
+      }}
+
+      window.location.href = streamPlayerUrl;
+    }}
+
+    document.getElementById('searchInput').addEventListener('input', function(e) {{
+      const query = e.target.value.toLowerCase();
+      const filteredLectures = lecturesData.filter(lecture =>
+        lecture.title.toLowerCase().includes(query)
+      );
+      renderLectures(filteredLectures);
+    }});
+
+    document.addEventListener('DOMContentLoaded', function() {{
+      console.log('DOM loaded, starting lecture load...');
+      loadLectures();
+    }});
+  </script>
+  <script src="{prefix}stream-player-utils.js"></script>
+  <script src="{prefix}theme.js"></script>
+  <nav class="bottom-nav">
+    <a href="{prefix}app.html" class="active"><i class="fas fa-lightbulb"></i><span>Home</span></a>
+    <a href="{prefix}00x12345.html"><i class="fas fa-play-circle"></i><span>Videos</span></a>
+    <a href="{prefix}searchx.html"><i class="fas fa-search"></i><span>Search</span></a>
+    <a href="{prefix}quizx/index.html"><i class="fas fa-question-circle"></i><span>Q Bank</span></a>
+  </nav>
 </body>
 </html>"""
 
