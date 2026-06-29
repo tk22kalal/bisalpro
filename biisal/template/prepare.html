@@ -64,6 +64,52 @@
         .download-btn:hover { background: #1a365d; }
         .download-btn:disabled { background: #ccc; cursor: not-allowed; }
 
+        /* Download manager buttons */
+        .dm-buttons {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .dm-buttons.visible { display: flex; }
+
+        @media (min-width: 480px) {
+            .dm-buttons { flex-direction: row; justify-content: center; }
+        }
+
+        .dm-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            letter-spacing: 0.3px;
+            transition: opacity 0.2s, transform 0.15s;
+            white-space: nowrap;
+            min-width: 110px;
+            color: #fff;
+        }
+
+        .dm-btn:hover   { opacity: 0.85; transform: translateY(-1px); }
+        .dm-btn:active  { transform: scale(0.97); }
+        .btn-direct     { background: linear-gradient(135deg, #2c5282, #1a365d); }
+        .btn-adm        { background: linear-gradient(135deg, #276749, #1c4532); }
+        .btn-idm        { background: linear-gradient(135deg, #744210, #532a00); }
+
+        .dm-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
         .loading {
             display: none;
             margin-top: 30px;
@@ -119,6 +165,29 @@
         <div>
             <button type="button" class="download-btn" id="downloadBtn" onclick="startDownload()" aria-label="Download">DOWNLOAD</button>
         </div>
+
+        <!-- Three download manager buttons (shown after link is generated) -->
+        <div class="dm-buttons" id="dmButtons">
+            <a id="btnDirect" class="dm-btn btn-direct" href="#" download>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                Direct
+            </a>
+            <a id="btnAdm" class="dm-btn btn-adm" href="#">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                ADM
+            </a>
+            <a id="btnIdm" class="dm-btn btn-idm" href="#">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                IDM
+            </a>
+        </div>
+        <p class="dm-label" id="dmLabel"></p>
 
         <div class="loading">
             <div class="spinner"></div>
@@ -218,10 +287,21 @@
                 if (data.success) {
                     loading.style.display = 'none';
                     statusMsg.className = 'status-message success';
-                    statusMsg.textContent = '✅ Download starting...';
+                    statusMsg.textContent = '✅ Choose how to download:';
                     statusMsg.style.display = 'block';
-                    window.location.href = data.download_url;
-                    setTimeout(() => buttons.forEach(b => b.disabled = false), 3000);
+                    buttons.forEach(b => b.disabled = false);
+
+                    // Build intent URLs
+                    const url = data.download_url;
+                    const scheme  = url.startsWith('https') ? 'https' : 'http';
+                    const stripped = url.replace(/^https?:\/\//, '');
+
+                    document.getElementById('btnDirect').href = url;
+                    document.getElementById('btnAdm').href    = 'intent://' + stripped + '#Intent;scheme=' + scheme + ';package=com.dv.adm;end';
+                    document.getElementById('btnIdm').href    = 'intent://' + stripped + '#Intent;scheme=' + scheme + ';package=idm.internet.download.manager;end';
+
+                    document.getElementById('dmButtons').classList.add('visible');
+                    document.getElementById('dmLabel').textContent = 'ADM & IDM work on Android only';
                 } else {
                     throw new Error(data.error || 'Failed to generate download link');
                 }
