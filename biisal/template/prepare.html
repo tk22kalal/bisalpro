@@ -2,11 +2,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{file_name}} - Generate Stream</title>
     <style>
+        /* --- RESET & BASE --- */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             background: white;
             font-family: Arial, sans-serif;
@@ -24,6 +29,7 @@
             width: 100%;
         }
 
+        /* --- PLAYER BUTTONS --- */
         .player-buttons {
             display: flex;
             gap: 20px;
@@ -43,11 +49,23 @@
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
+
+            /* Disable long-press / selection */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
         }
 
-        .player-btn:hover { background: #1a365d; }
-        .player-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .player-btn:hover {
+            background: #1a365d;
+        }
+        .player-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
 
+        /* --- DOWNLOAD BUTTON (legacy) --- */
         .download-btn {
             background: #2c5282;
             color: white;
@@ -59,12 +77,22 @@
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
+
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
         }
 
-        .download-btn:hover { background: #1a365d; }
-        .download-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .download-btn:hover {
+            background: #1a365d;
+        }
+        .download-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
 
-        /* Download manager buttons */
+        /* --- DOWNLOAD MANAGER BUTTONS --- */
         .dm-buttons {
             display: none;
             flex-direction: column;
@@ -73,10 +101,15 @@
             margin-top: 20px;
         }
 
-        .dm-buttons.visible { display: flex; }
+        .dm-buttons.visible {
+            display: flex;
+        }
 
         @media (min-width: 480px) {
-            .dm-buttons { flex-direction: row; justify-content: center; }
+            .dm-buttons {
+                flex-direction: row;
+                justify-content: center;
+            }
         }
 
         .dm-btn {
@@ -96,13 +129,31 @@
             white-space: nowrap;
             min-width: 110px;
             color: #fff;
+
+            /* Disable long-press / selection */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
         }
 
-        .dm-btn:hover   { opacity: 0.85; transform: translateY(-1px); }
-        .dm-btn:active  { transform: scale(0.97); }
-        .btn-direct     { background: #2c5282; }
-        .btn-adm        { background: #2c5282; }
-        .btn-idm        { background: #2c5282; }
+        .dm-btn:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+        .dm-btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-direct {
+            background: #2c5282;
+        }
+        .btn-adm {
+            background: #2c5282;
+        }
+        .btn-idm {
+            background: #2c5282;
+        }
 
         .dm-label {
             font-size: 12px;
@@ -110,6 +161,7 @@
             margin-top: 4px;
         }
 
+        /* --- LOADING --- */
         .loading {
             display: none;
             margin-top: 30px;
@@ -126,8 +178,12 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .loading-text {
@@ -136,6 +192,7 @@
             margin-top: 10px;
         }
 
+        /* --- STATUS MESSAGE --- */
         .status-message {
             margin-top: 20px;
             padding: 15px;
@@ -145,24 +202,50 @@
             font-weight: 500;
         }
 
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
 
+        /* --- RESPONSIVE --- */
         @media (max-width: 480px) {
-            .player-btn  { width: 140px; height: 55px; font-size: 14px; }
-            .download-btn { width: 180px; height: 50px; font-size: 14px; }
+            .player-btn {
+                width: 140px;
+                height: 55px;
+                font-size: 14px;
+            }
+            .download-btn {
+                width: 180px;
+                height: 50px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- PLAYER BUTTONS -->
         <div class="player-buttons">
-            <button type="button" class="player-btn" id="plyrBtn"    onclick="generateStream('plyr')"    aria-label="Stream IOS/PC">IOS/PC</button>
-            <button type="button" class="player-btn" id="videojsBtn" onclick="generateStream('videojs')" aria-label="Stream ANDROID">ANDROID</button>
+            <button type="button" class="player-btn" id="plyrBtn" onclick="generateStream('plyr')" aria-label="Stream IOS/PC">
+                IOS/PC
+            </button>
+            <button type="button" class="player-btn" id="videojsBtn" onclick="generateStream('videojs')" aria-label="Stream ANDROID">
+                ANDROID
+            </button>
         </div>
 
-        <!-- Three download manager buttons (shown after link is generated) -->
+        <!-- DOWNLOAD MANAGER BUTTONS (shown after link is generated) -->
         <div class="dm-buttons" id="dmButtons">
             <a id="btnDirect" class="dm-btn btn-direct" href="#" download>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -185,139 +268,245 @@
         </div>
         <p class="dm-label" id="dmLabel"></p>
 
+        <!-- LOADING -->
         <div class="loading">
             <div class="spinner"></div>
             <p class="loading-text" id="loadingText">Generating link...</p>
         </div>
 
+        <!-- STATUS MESSAGE -->
         <div class="status-message" id="statusMessage"></div>
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const linkType  = urlParams.get('type');
+        (function() {
+            'use strict';
 
-        window.addEventListener('DOMContentLoaded', () => {
-            if (linkType === 'stream') {
-                document.getElementById('downloadBtn').style.display = 'none';
-            } else if (linkType === 'download') {
-                document.querySelector('.player-buttons').style.display = 'none';
-                startDownload();
-            }
-        });
-
-        async function generateStream(playerType, retryCount = 0) {
-            const buttons     = document.querySelectorAll('.player-btn, .download-btn');
-            const loading     = document.querySelector('.loading');
-            const statusMsg   = document.getElementById('statusMessage');
-            const loadingText = document.getElementById('loadingText');
-
-            buttons.forEach(b => b.disabled = true);
-            loading.style.display = 'block';
-            statusMsg.style.display = 'none';
-            loadingText.textContent = `Generating ${playerType === 'plyr' ? 'IOS/PC' : 'ANDROID'} stream link...${retryCount > 0 ? ` (Retry ${retryCount}/5)` : ''}`;
-
-            try {
-                const controller = new AbortController();
-                const tid = setTimeout(() => controller.abort(), 45000);
-                const response = await fetch(`/api/generate/{{token}}?player=${playerType}`, {
-                    signal: controller.signal,
-                    headers: { 'Accept': 'application/json' }
+            // ---- DISABLE LONG-PRESS / CONTEXT MENU ON ALL BUTTONS ----
+            function preventLongPress(el) {
+                if (!el) return;
+                // Block context menu (right-click / long-press on mobile)
+                el.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    return false;
                 });
-                clearTimeout(tid);
 
-                const ct = response.headers.get('content-type') || '';
-                if (!ct.includes('application/json')) throw new Error('Server returned non-JSON response. Please try again.');
-
-                const data = await response.json();
-                if (data.success) {
-                    statusMsg.className = 'status-message success';
-                    statusMsg.textContent = '✅ Stream link generated! Redirecting...';
-                    statusMsg.style.display = 'block';
-                    setTimeout(() => window.location.href = data.stream_url, 1500);
-                } else {
-                    throw new Error(data.error || 'Failed to generate stream link');
-                }
-            } catch (error) {
-                const maxRetries = 5;
-                const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
-                if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
-                    statusMsg.className = 'status-message warning';
-                    statusMsg.textContent = `⏳ Retrying in ${Math.round(delay / 1000)}s... (${retryCount + 1}/${maxRetries})`;
-                    statusMsg.style.display = 'block';
-                    setTimeout(() => generateStream(playerType, retryCount + 1), delay);
-                    return;
-                }
-                statusMsg.className = 'status-message error';
-                statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message);
-                statusMsg.style.display = 'block';
-                buttons.forEach(b => b.disabled = false);
-                loading.style.display = 'none';
-            }
-        }
-
-        async function startDownload(retryCount = 0) {
-            const buttons     = document.querySelectorAll('.player-btn, .download-btn');
-            const loading     = document.querySelector('.loading');
-            const statusMsg   = document.getElementById('statusMessage');
-            const loadingText = document.getElementById('loadingText');
-
-            buttons.forEach(b => b.disabled = true);
-            loading.style.display = 'block';
-            statusMsg.style.display = 'none';
-            loadingText.textContent = `Generating download link...${retryCount > 0 ? ` (Retry ${retryCount}/5)` : ''}`;
-
-            try {
-                const controller = new AbortController();
-                const tid = setTimeout(() => controller.abort(), 45000);
-                const response = await fetch('/api/download/{{token}}', {
-                    signal: controller.signal,
-                    headers: { 'Accept': 'application/json' }
+                // Block selection via double-click / drag
+                el.addEventListener('selectstart', function(e) {
+                    e.preventDefault();
+                    return false;
                 });
-                clearTimeout(tid);
 
-                const ct = response.headers.get('content-type') || '';
-                if (!ct.includes('application/json')) throw new Error('Server returned non-JSON response. Please try again.');
+                // Extra protection for mobile: block copy/cut/paste events
+                el.addEventListener('copy', function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+                el.addEventListener('cut', function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+                el.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    return false;
+                });
+            }
 
-                const data = await response.json();
-                if (data.success) {
+            // Apply to all player buttons
+            document.querySelectorAll('.player-btn').forEach(function(btn) {
+                preventLongPress(btn);
+            });
+
+            // Apply to legacy download button (if present)
+            var downloadBtn = document.getElementById('downloadBtn');
+            if (downloadBtn) preventLongPress(downloadBtn);
+
+            // Apply to DM buttons (they exist in DOM from the start)
+            document.querySelectorAll('.dm-btn').forEach(function(btn) {
+                preventLongPress(btn);
+            });
+
+            // Also protect buttons that might be added dynamically later
+            // We'll re-run when DM buttons become visible (in startDownload)
+            var observer = new MutationObserver(function() {
+                document.querySelectorAll('.dm-btn:not([data-protected])').forEach(function(btn) {
+                    preventLongPress(btn);
+                    btn.setAttribute('data-protected', 'true');
+                });
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            // ---- EXISTING LOGIC ----
+            var urlParams = new URLSearchParams(window.location.search);
+            var linkType = urlParams.get('type');
+
+            window.addEventListener('DOMContentLoaded', function() {
+                if (linkType === 'stream') {
+                    var btn = document.getElementById('downloadBtn');
+                    if (btn) btn.style.display = 'none';
+                } else if (linkType === 'download') {
+                    var playerBtns = document.querySelector('.player-buttons');
+                    if (playerBtns) playerBtns.style.display = 'none';
+                    startDownload();
+                }
+            });
+
+            window.generateStream = async function(playerType, retryCount) {
+                retryCount = retryCount || 0;
+                var buttons = document.querySelectorAll('.player-btn, .download-btn');
+                var loading = document.querySelector('.loading');
+                var statusMsg = document.getElementById('statusMessage');
+                var loadingText = document.getElementById('loadingText');
+
+                buttons.forEach(function(b) { b.disabled = true; });
+                loading.style.display = 'block';
+                statusMsg.style.display = 'none';
+                loadingText.textContent = 'Generating ' + (playerType === 'plyr' ? 'IOS/PC' : 'ANDROID') +
+                    ' stream link...' + (retryCount > 0 ? ' (Retry ' + retryCount + '/5)' : '');
+
+                try {
+                    var controller = new AbortController();
+                    var tid = setTimeout(function() { controller.abort(); }, 45000);
+                    var response = await fetch('/api/generate/{{token}}?player=' + playerType, {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    clearTimeout(tid);
+
+                    var ct = response.headers.get('content-type') || '';
+                    if (!ct.includes('application/json')) {
+                        throw new Error('Server returned non-JSON response. Please try again.');
+                    }
+
+                    var data = await response.json();
+                    if (data.success) {
+                        statusMsg.className = 'status-message success';
+                        statusMsg.textContent = '✅ Stream link generated! Redirecting...';
+                        statusMsg.style.display = 'block';
+                        setTimeout(function() {
+                            window.location.href = data.stream_url;
+                        }, 1500);
+                    } else {
+                        throw new Error(data.error || 'Failed to generate stream link');
+                    }
+                } catch (error) {
+                    var maxRetries = 5;
+                    var delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+                    if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
+                        statusMsg.className = 'status-message warning';
+                        statusMsg.textContent = '⏳ Retrying in ' + Math.round(delay / 1000) + 's... (' + (retryCount + 1) +
+                            '/' + maxRetries + ')';
+                        statusMsg.style.display = 'block';
+                        setTimeout(function() {
+                            window.generateStream(playerType, retryCount + 1);
+                        }, delay);
+                        return;
+                    }
+                    statusMsg.className = 'status-message error';
+                    statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' :
+                        error.message);
+                    statusMsg.style.display = 'block';
+                    buttons.forEach(function(b) { b.disabled = false; });
                     loading.style.display = 'none';
-                    statusMsg.className = 'status-message success';
-                    statusMsg.textContent = '✅ Choose how to download:';
-                    statusMsg.style.display = 'block';
-                    buttons.forEach(b => b.disabled = false);
-
-                    // Build intent URLs
-                    const url = data.download_url;
-                    const scheme  = url.startsWith('https') ? 'https' : 'http';
-                    const stripped = url.replace(/^https?:\/\//, '');
-
-                    document.getElementById('btnDirect').href = url;
-                    document.getElementById('btnAdm').href    = 'intent://' + stripped + '#Intent;scheme=' + scheme + ';package=com.dv.adm;end';
-                    document.getElementById('btnIdm').href    = 'intent://' + stripped + '#Intent;scheme=' + scheme + ';package=idm.internet.download.manager;end';
-
-                    document.getElementById('dmButtons').classList.add('visible');
-                    document.getElementById('dmLabel').textContent = 'ADM & IDM work on Android only';
-                } else {
-                    throw new Error(data.error || 'Failed to generate download link');
                 }
-            } catch (error) {
-                const maxRetries = 5;
-                const delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
-                if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
-                    statusMsg.className = 'status-message warning';
-                    statusMsg.textContent = `⏳ Retrying in ${Math.round(delay / 1000)}s... (${retryCount + 1}/${maxRetries})`;
+            };
+
+            window.startDownload = async function(retryCount) {
+                retryCount = retryCount || 0;
+                var buttons = document.querySelectorAll('.player-btn, .download-btn');
+                var loading = document.querySelector('.loading');
+                var statusMsg = document.getElementById('statusMessage');
+                var loadingText = document.getElementById('loadingText');
+
+                buttons.forEach(function(b) { b.disabled = true; });
+                loading.style.display = 'block';
+                statusMsg.style.display = 'none';
+                loadingText.textContent = 'Generating download link...' + (retryCount > 0 ? ' (Retry ' + retryCount + '/5)' :
+                    '');
+
+                try {
+                    var controller = new AbortController();
+                    var tid = setTimeout(function() { controller.abort(); }, 45000);
+                    var response = await fetch('/api/download/{{token}}', {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    clearTimeout(tid);
+
+                    var ct = response.headers.get('content-type') || '';
+                    if (!ct.includes('application/json')) {
+                        throw new Error('Server returned non-JSON response. Please try again.');
+                    }
+
+                    var data = await response.json();
+                    if (data.success) {
+                        loading.style.display = 'none';
+                        statusMsg.className = 'status-message success';
+                        statusMsg.textContent = '✅ Choose how to download:';
+                        statusMsg.style.display = 'block';
+                        buttons.forEach(function(b) { b.disabled = false; });
+
+                        var url = data.download_url;
+                        var scheme = url.startsWith('https') ? 'https' : 'http';
+                        var stripped = url.replace(/^https?:\/\//, '');
+
+                        var btnDirect = document.getElementById('btnDirect');
+                        var btnAdm = document.getElementById('btnAdm');
+                        var btnIdm = document.getElementById('btnIdm');
+
+                        btnDirect.href = url;
+                        btnAdm.href = 'intent://' + stripped + '#Intent;scheme=' + scheme +
+                            ';package=com.dv.adm;end';
+                        btnIdm.href = 'intent://' + stripped + '#Intent;scheme=' + scheme +
+                            ';package=idm.internet.download.manager;end';
+
+                        // Re-apply long-press protection (they might have been recreated)
+                        document.querySelectorAll('.dm-btn').forEach(function(btn) {
+                            preventLongPress(btn);
+                            btn.setAttribute('data-protected', 'true');
+                        });
+
+                        document.getElementById('dmButtons').classList.add('visible');
+                        document.getElementById('dmLabel').textContent = 'ADM & IDM work on Android only';
+                    } else {
+                        throw new Error(data.error || 'Failed to generate download link');
+                    }
+                } catch (error) {
+                    var maxRetries = 5;
+                    var delay = Math.min(2000 * Math.pow(1.5, retryCount), 10000);
+                    if ((error.name === 'AbortError' || error.message.includes('JSON')) && retryCount < maxRetries) {
+                        statusMsg.className = 'status-message warning';
+                        statusMsg.textContent = '⏳ Retrying in ' + Math.round(delay / 1000) + 's... (' + (retryCount + 1) +
+                            '/' + maxRetries + ')';
+                        statusMsg.style.display = 'block';
+                        setTimeout(function() {
+                            window.startDownload(retryCount + 1);
+                        }, delay);
+                        return;
+                    }
+                    statusMsg.className = 'status-message error';
+                    statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' :
+                        error.message);
                     statusMsg.style.display = 'block';
-                    setTimeout(() => startDownload(retryCount + 1), delay);
-                    return;
+                    buttons.forEach(function(b) { b.disabled = false; });
+                    loading.style.display = 'none';
                 }
-                statusMsg.className = 'status-message error';
-                statusMsg.textContent = '❌ ' + (error.name === 'AbortError' ? 'Request timed out. Please try again.' : error.message);
-                statusMsg.style.display = 'block';
-                buttons.forEach(b => b.disabled = false);
-                loading.style.display = 'none';
+            };
+
+            // ---- EXTRA: prevent context menu on the whole container (just in case) ----
+            var container = document.querySelector('.container');
+            if (container) {
+                container.addEventListener('contextmenu', function(e) {
+                    // Only block if the target is a button or anchor we care about
+                    var target = e.target.closest('.player-btn, .dm-btn, .download-btn');
+                    if (target) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
             }
-        }
+
+        })();
     </script>
 </body>
 </html>
