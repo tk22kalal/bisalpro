@@ -71,25 +71,68 @@
             margin-bottom: 30px;
         }
 
-        .download-btn {
-            background: #2c5282;
-            color: #fff;
-            border: none;
-            padding: 14px 40px;
-            font-size: 16px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.3s;
-            text-decoration: none;
-            display: inline-block;
+        /* Download buttons row */
+        .dl-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
         }
 
-        .download-btn:hover { background: #1a365d; }
+        @media (min-width: 480px) {
+            .dl-buttons {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+
+        .dl-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            letter-spacing: 0.3px;
+            transition: opacity 0.2s, transform 0.15s;
+            white-space: nowrap;
+            min-width: 120px;
+        }
+
+        .dl-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+        .dl-btn:active { transform: scale(0.97); }
+
+        .btn-direct {
+            background: linear-gradient(135deg, #2c5282, #1a365d);
+            color: #fff;
+        }
+
+        .btn-adm {
+            background: linear-gradient(135deg, #276749, #1c4532);
+            color: #fff;
+        }
+
+        .btn-idm {
+            background: linear-gradient(135deg, #744210, #532a00);
+            color: #fff;
+        }
+
+        /* Download icon SVG */
+        .dl-icon {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
+        }
 
         .status {
-            margin-top: 20px;
-            font-size: 14px;
+            margin-top: 18px;
+            font-size: 13px;
             color: #48bb78;
         }
     </style>
@@ -107,12 +150,49 @@
             <p class="countdown-text">Download starting in <span id="countText">10</span> seconds…</p>
         </div>
 
-        <a id="downloadLink" class="download-btn" href="{{ file_url }}" download>Download Now</a>
+        <div class="dl-buttons">
+            <!-- Direct Download -->
+            <a id="directBtn" class="dl-btn btn-direct" href="{{ file_url }}" download>
+                <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                Direct
+            </a>
+
+            <!-- ADM Download -->
+            <a id="admBtn" class="dl-btn btn-adm" href="#">
+                <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                ADM
+            </a>
+
+            <!-- IDM Download -->
+            <a id="idmBtn" class="dl-btn btn-idm" href="#">
+                <svg class="dl-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+                </svg>
+                IDM
+            </a>
+        </div>
+
         <p class="status" id="statusMsg"></p>
     </div>
 
     <script>
         const fileUrl = "{{ file_url }}";
+
+        // Build intent URL: strip scheme, detect http vs https, prepend intent://
+        function intentUrl(fileUrl, pkg) {
+            const scheme  = fileUrl.startsWith('https') ? 'https' : 'http';
+            const stripped = fileUrl.replace(/^https?:\/\//, '');
+            return 'intent://' + stripped + '#Intent;scheme=' + scheme + ';package=' + pkg + ';end';
+        }
+
+        document.getElementById('admBtn').href = intentUrl(fileUrl, 'com.dv.adm');
+        document.getElementById('idmBtn').href = intentUrl(fileUrl, 'idm.internet.download.manager');
+
+        // Countdown → auto-trigger direct download
         let seconds = 10;
         const numEl  = document.getElementById('countNum');
         const txtEl  = document.getElementById('countText');
