@@ -24,44 +24,60 @@ PROTECT_CONTENT = os.environ.get('PROTECT_CONTENT', "False") == "True"
 DISABLE_CHANNEL_BUTTON = os.environ.get("DISABLE_CHANNEL_BUTTON", None) == 'True'
 GIT_TOKEN = os.environ.get('GIT_TOKEN', '')
 THUMB_API = os.environ.get('THUMB_API', '')
+
 GITHUB_OWNER_REPO = "sunday2212/webreadme4"
 
-MY_PASS = None
-
+# State machine for /batch and /fwd conversations: user_id -> {'state': str, 'data': dict}
 _batch_sessions = {}
 _fwd_sessions = {}
-_fbatch_sessions = {}
-_FBATCH_CHUNK = 100
-_FBATCH_DELAY = 0.4
+_fbatch_sessions = {}   # user_id → {'state': str}
 
+_FBATCH_CHUNK = 100     # message IDs per get_messages() call
+_FBATCH_DELAY = 0.4     # seconds between chunks (flood-safe)
 
 def sanitize_caption(text: str) -> str:
+    """Sanitize caption by removing HTML tags, links, @mentions, and hashtags"""
     if not text:
         return text
+    # Remove HTML tags
     text = re.sub(r'<[^>]+>', '', text)
+    # Remove @mentions
     text = re.sub(r'@[\w_]+', '', text)
+    # Remove all kinds of links
     text = re.sub(r'(?:https?://|t\.me/|telegram\.me/)[^\s]+', '', text)
+    # Remove hashtags
     text = re.sub(r'\s*#\w+', '', text)
+    # Clean up extra spaces
     text = re.sub(r'\s+', ' ', text.strip())
     return text
 
-
 async def create_intermediate_link(message: Message):
+    """Create intermediate link for the message and store data temporarily.
+    Uses the current domain's BASE_URL for complete domain independence."""
+    # Extract file information
     media = get_media_from_message(message)
     if not media:
         raise ValueError("No media found in message")
 
+    # Get caption with fallback chain and sanitization
     caption = ""
+    
+    # Try message caption first
     if message.caption:
         caption = sanitize_caption(message.caption.html)
+    
+    # Fallback to filename if caption is empty after sanitization
     if not caption or not caption.strip():
         filename = getattr(media, 'file_name', None) or get_name(message)
         if filename:
             caption = sanitize_caption(filename)
+    
+    # Fallback to random name if still empty
     if not caption or not caption.strip():
         import secrets
         caption = f"file_{secrets.token_hex(4)}"
-
+    
+    # Prepare message data for temporary storage
     message_data = {
         'message_id': message.id,
         'file_name': getattr(media, 'file_name', None) or get_name(message),
@@ -71,31 +87,46 @@ async def create_intermediate_link(message: Message):
         'from_chat_id': message.chat.id,
         'file_unique_id': getattr(media, 'file_unique_id', '')
     }
-
+    
+    # Store with current domain for domain independence
     current_domain = Var.get_current_domain()
     token = await db.store_temp_file(message_data, domain=current_domain)
+    
+    # Use the current instance's BASE_URL (not hardcoded URL_WEB)
     base_url = Var.get_base_url()
     intermediate_link = f"{base_url}prepare/{token}"
+    
     return intermediate_link, caption
 
-
 async def create_intermediate_link_for_batch(message: Message, folder_name: str = None, client: Client = None, shared_thumbnail_url: str = None):
+    """Create intermediate links for batch processing - both stream and download, with optional thumbnail.
+    
+    DOMAIN INDEPENDENCE: Each deployment generates links ONLY for its own domain.
+    Set SERVE_DOMAIN='web' or SERVE_DOMAIN='webx' on each Heroku instance.
+    If DUAL_DOMAIN_ENABLED=True and no SERVE_DOMAIN set, generates for both (legacy mode)."""
     try:
         media = get_media_from_message(message)
         if not media:
             raise ValueError("No media found in message")
 
+        # Get caption with fallback chain and sanitization
         caption = ""
+        
+        # Try message caption first
         if message.caption:
             caption = sanitize_caption(message.caption.html)
+        
+        # Fallback to filename if caption is empty after sanitization
         if not caption or not caption.strip():
             filename = getattr(media, 'file_name', None) or get_name(message)
             if filename:
                 caption = sanitize_caption(filename)
+        
+        # Fallback to random name if still empty
         if not caption or not caption.strip():
             import secrets
             caption = f"file_{secrets.token_hex(4)}"
-
+        
         message_data = {
             'message_id': message.id,
             'file_name': getattr(media, 'file_name', None) or get_name(message),
@@ -105,70 +136,126 @@ async def create_intermediate_link_for_batch(message: Message, folder_name: str 
             'from_chat_id': message.chat.id,
             'file_unique_id': getattr(media, 'file_unique_id', '')
         }
-
+        
+        # Extract and upload thumbnail for video files BEFORE storing in database
         mime_type = getattr(media, 'mime_type', '')
-        thumbnail_url = shared_thumbnail_url
-
+        thumbnail_url = shared_thumbnail_url  # Use shared thumbnail if provided
+        
+        # Log thumbnail processing conditions
+        logging.info(f"Thumbnail check - mime_type: {mime_type}, folder_name: {folder_name}, THUMB_API: {'Present' if THUMB_API else 'Missing'}, client: {'Present' if client else 'Missing'}, shared_thumbnail: {'Present' if shared_thumbnail_url else 'None'}")
+        
+        # Only extract thumbnail if we don't have a shared one AND this is a video
         if not shared_thumbnail_url and mime_type and mime_type.startswith('video/') and folder_name and THUMB_API and client:
             temp_video_path = None
             thumbnail_path = None
             try:
+                logging.info(f"🎬 Starting thumbnail extraction for video: {caption}")
+                logging.info(f"   Video mime type: {mime_type}")
+                logging.info(f"   Folder name: {folder_name}")
+                
+                # Download video temporarily
                 temp_dir = Path("/tmp/batch_videos")
                 temp_dir.mkdir(exist_ok=True)
                 import secrets as sec
                 temp_video_path = str(temp_dir / f"video_{sec.token_hex(8)}.mp4")
+                
+                logging.info(f"   Downloading video to: {temp_video_path}")
+                # Download the video file
                 await client.download_media(message, file_name=temp_video_path)
+                
+                video_size = os.path.getsize(temp_video_path) if os.path.exists(temp_video_path) else 0
+                logging.info(f"   Video downloaded successfully ({video_size} bytes)")
+                
+                # Extract thumbnail from middle of video
+                logging.info(f"   Extracting thumbnail from video...")
                 thumbnail_path = await extract_thumbnail_from_middle(temp_video_path)
+                
+                thumb_size = os.path.getsize(thumbnail_path) if os.path.exists(thumbnail_path) else 0
+                logging.info(f"   Thumbnail extracted successfully: {thumbnail_path} ({thumb_size} bytes)")
+                
+                # Upload thumbnail to GitHub
+                logging.info(f"   Uploading thumbnail to GitHub (folder: {folder_name})...")
                 thumbnail_url = await upload_image_to_github(
                     image_path=thumbnail_path,
                     github_token=THUMB_API,
                     folder_name=folder_name,
                     title_name=caption
                 )
-                logging.info(f"Thumbnail uploaded: {thumbnail_url}")
+                
+                logging.info(f"✅ Thumbnail uploaded successfully: {thumbnail_url}")
+                    
             except Exception as thumb_error:
                 thumb_err_str = str(thumb_error)
-                logging.error(f"Thumbnail failed for '{caption}': {thumb_err_str}")
+                logging.error(f"❌ Thumbnail failed for '{caption}': {thumb_err_str}", exc_info=True)
+                # Store the first thumbnail error so the batch loop can report it to the bot
                 if not message_data.get('_thumb_error'):
                     message_data['_thumb_error'] = thumb_err_str
             finally:
+                # Always cleanup temporary files, even on failure
                 try:
                     if temp_video_path and os.path.exists(temp_video_path):
                         os.remove(temp_video_path)
+                        logging.debug(f"Cleaned up temp video: {temp_video_path}")
                     if thumbnail_path and os.path.exists(thumbnail_path):
                         os.remove(thumbnail_path)
+                        logging.debug(f"Cleaned up thumbnail: {thumbnail_path}")
                 except Exception as cleanup_error:
-                    logging.error(f"Cleanup error: {cleanup_error}")
-
+                    logging.error(f"Error cleaning up temp files: {cleanup_error}")
+        else:
+            # Log why thumbnail extraction was skipped
+            reasons = []
+            if not mime_type or not mime_type.startswith('video/'):
+                reasons.append(f"not a video (mime: {mime_type})")
+            if not folder_name:
+                reasons.append("no folder_name provided")
+            if not THUMB_API:
+                reasons.append("THUMB_API not configured")
+            if not client:
+                reasons.append("no client provided")
+            if reasons:
+                logging.info(f"⏭️  Skipping thumbnail for {caption}: {', '.join(reasons)}")
+        
         if thumbnail_url:
             message_data['thumbnail_url'] = thumbnail_url
-
+        
+        # DOMAIN INDEPENDENCE: Get current domain and base URL
         current_domain = Var.get_current_domain()
         base_url = Var.get_base_url()
-
+        
+        # If SERVE_DOMAIN is set (web or webx), only create token for THIS domain
+        # This ensures complete independence - each Heroku app handles its own domain
         if current_domain:
             token = await db.store_temp_file(message_data, domain=current_domain)
             stream_link = f"{base_url}prepare/{token}?type=stream"
             download_link = f"{base_url}prepare/{token}?type=download"
+            
             result = {
                 "title": caption,
                 "streamingUrl": stream_link,
                 "downloadUrl": download_link
             }
         else:
+            # Legacy mode: if no SERVE_DOMAIN set, create tokens for both (backwards compatible)
             token_web = await db.store_temp_file(message_data, domain='web')
             token_webx = await db.store_temp_file(message_data, domain='webx')
+            
+            stream_link = f"{Var.URL_WEB}prepare/{token_web}?type=stream"
+            stream_link_x = f"{Var.URL_WEBX}prepare/{token_webx}?type=stream"
+            download_link = f"{Var.URL_WEB}prepare/{token_web}?type=download"
+            download_link_x = f"{Var.URL_WEBX}prepare/{token_webx}?type=download"
+            
             result = {
                 "title": caption,
-                "streamingUrl": f"{Var.URL_WEB}prepare/{token_web}?type=stream",
-                "streamingUrlx": f"{Var.URL_WEBX}prepare/{token_webx}?type=stream",
-                "downloadUrl": f"{Var.URL_WEB}prepare/{token_web}?type=download",
-                "downloadUrlx": f"{Var.URL_WEBX}prepare/{token_webx}?type=download"
+                "streamingUrl": stream_link,
+                "streamingUrlx": stream_link_x,
+                "downloadUrl": download_link,
+                "downloadUrlx": download_link_x
             }
-
+        
         if thumbnail_url:
             result["thumbnailUrl"] = thumbnail_url
 
+        # Carry thumb error forward so the batch loop can surface it to the bot
         thumb_err = message_data.get('_thumb_error')
         if thumb_err:
             result["_thumb_error"] = thumb_err
@@ -177,12 +264,13 @@ async def create_intermediate_link_for_batch(message: Message, folder_name: str 
     except Exception as e:
         raise ValueError(f"Failed to create intermediate links: {str(e)}")
 
-
 async def create_pdf_download_links(message: Message):
+    """Create download-only links for PDF files. No streaming URL, no thumbnail."""
     media = get_media_from_message(message)
     if not media:
         raise ValueError("No media found in message")
 
+    # Title priority: caption → filename → random
     title = ""
     if message.caption:
         title = sanitize_caption(message.caption.html)
@@ -205,6 +293,7 @@ async def create_pdf_download_links(message: Message):
     }
 
     current_domain = Var.get_current_domain()
+
     if current_domain:
         token = await db.store_temp_file(message_data, domain=current_domain)
         base_url = Var.get_base_url()
@@ -214,6 +303,7 @@ async def create_pdf_download_links(message: Message):
         else:
             return {"title": title, "pdf_downloadUrlx": download_link}
     else:
+        # Legacy mode: generate for both domains
         token_web = await db.store_temp_file(message_data, domain='web')
         token_webx = await db.store_temp_file(message_data, domain='webx')
         return {
@@ -224,10 +314,13 @@ async def create_pdf_download_links(message: Message):
 
 
 async def process_message(msg, json_output, skipped_messages, folder_name=None, client=None, shared_thumbnail_url=None):
+    """Process individual message and create intermediate link (updated for new system with thumbnail support)"""
     try:
+        # Silently skip plain text messages (no media at all)
         if not (msg.document or msg.video or msg.audio):
             return
 
+        # PDF documents → download-only links, no streaming or thumbnail
         is_pdf = (
             msg.document and
             getattr(msg.document, 'mime_type', '') == 'application/pdf'
@@ -238,10 +331,12 @@ async def process_message(msg, json_output, skipped_messages, folder_name=None, 
             json_output.append(pdf_data)
             return
 
+        # Videos / audio / other documents → full streaming + download links
         intermediate_data = await create_intermediate_link_for_batch(msg, folder_name, client, shared_thumbnail_url)
         json_output.append(intermediate_data)
 
     except Exception as e:
+        # Capture details for skipped messages
         file_name = get_name(msg) or "Unknown"
         skipped_messages.append({
             "id": msg.id,
@@ -249,10 +344,9 @@ async def process_message(msg, json_output, skipped_messages, folder_name=None, 
             "reason": str(e)
         })
 
-
 def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> str:
-    """Generate the lecture HTML page with dynamically calculated relative paths.
-
+    """Generate the lecture HTML page for a given JSON filename, with dynamic relative paths.
+    
     Depth rule:
       github_dest_folder = "owner/repo/user/path/parts"
       The HTML sits inside that folder, so to reach the repo root on GitHub Pages
@@ -323,22 +417,6 @@ def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> s
 
     .lecture-card {{
       position: relative;
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 15px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s;
-    }}
-
-    .lecture-card:hover {{
-      transform: translateY(-3px);
-    }}
-
-    .lecture-card h3 {{
-      margin-top: 0;
-      margin-bottom: 15px;
-      color: #2c3e50;
     }}
 
     .video-popup {{
@@ -434,6 +512,25 @@ def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> s
       height: 100%;
       border: none;
       border-radius: 4px;
+    }}
+
+    .lecture-card {{
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+    }}
+
+    .lecture-card:hover {{
+      transform: translateY(-3px);
+    }}
+
+    .lecture-card h3 {{
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #2c3e50;
     }}
 
     .button-container {{
@@ -592,20 +689,33 @@ def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> s
         if (lecturesData.length > 0) {{
           renderLectures(lecturesData);
         }} else {{
-          console.log('No lectures found in JSON');
-          document.getElementById('lectureList').innerHTML = '<p>No lectures available.</p>';
+          console.log('No lectures found in JSON, using fallback');
+          useFallbackLectures();
         }}
       }} catch (error) {{
         console.error('Error loading lectures:', error);
-        document.getElementById('lectureList').innerHTML =
-          '<p style="color:red;">Failed to load lectures: ' + error.message + '</p>';
+        console.log('Using fallback lectures due to error');
+        useFallbackLectures();
       }}
+    }}
+
+    function useFallbackLectures() {{
+      lecturesData = [
+        {{ title: "Introduction", streamingUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" }},
+        {{ title: "Basic Terminology", streamingUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" }}
+      ];
+      console.log('Using fallback lectures:', lecturesData.length, 'lectures');
+      renderLectures(lecturesData);
     }}
 
     function escapeHtml(text) {{
       const map = {{
-        '&': '&amp;', '<': '&lt;', '>': '&gt;',
-        '"': '&quot;', "'": '&#039;', '\\\\': '&#92;'
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+        '\\\\': '&#92;'
       }};
       return text.replace(/[&<>"'\\\\]/g, m => map[m]);
     }}
@@ -689,6 +799,11 @@ def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> s
       document.body.removeChild(popup);
     }}
 
+    function downloadVideo(streamUrl) {{
+      const downloadUrl = streamUrl.replace('/watch/', '/dl/');
+      window.open(downloadUrl, '_blank');
+    }}
+
     function openStreamPlayer(streamUrl, downloadUrl, title) {{
       if (!streamUrl) {{
         alert('Stream URL not available');
@@ -748,6 +863,11 @@ def generate_lecture_html(json_filename: str, github_dest_folder: str = '') -> s
 
 
 async def upload_to_github(file_content: str, file_path: str, commit_message: str, token: str, branch: str = None):
+    """Upload JSON file to GitHub repository.
+
+    file_path: expected format "owner/repo/path/to/file.json"
+    Returns (True, None) on success, (False, error_detail) on failure.
+    """
     import base64
     import aiohttp
 
@@ -755,33 +875,48 @@ async def upload_to_github(file_content: str, file_path: str, commit_message: st
         if not token:
             return False, "GIT_TOKEN is empty or not set"
 
+        # Normalize and split path
         normalized = file_path.strip().lstrip('/').rstrip('/')
         parts = normalized.split('/', 2)
         if len(parts) < 3:
-            return False, f"Invalid path format: '{file_path}'"
+            return False, f"Invalid path format: '{file_path}' — expected owner/repo/path/to/file.json"
 
         owner, repo, path = parts[0], parts[1], parts[2]
         api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+
         content_encoded = base64.b64encode(file_content.encode('utf-8')).decode('utf-8')
+
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github.v3+json"
         }
 
         async with aiohttp.ClientSession() as session:
-            params = {'ref': branch} if branch else {}
+            params = {}
+            if branch:
+                params['ref'] = branch
+
             sha = None
+            get_warning = None
             async with session.get(api_url, headers=headers, params=params) as resp_get:
                 if resp_get.status == 200:
                     data = await resp_get.json()
                     sha = data.get('sha')
+                elif resp_get.status == 404:
+                    sha = None  # file doesn't exist yet, will create
                 elif resp_get.status == 401:
-                    return False, "GitHub token is invalid or expired (401)"
+                    return False, "GitHub token is invalid or expired (401 Unauthorized)"
                 elif resp_get.status == 403:
-                    text = await resp_get.text()
-                    return False, f"GitHub 403 Forbidden: {text[:300]}"
+                    get_text = await resp_get.text()
+                    return False, f"GitHub access forbidden (403) — token may lack 'repo' scope. Detail: {get_text[:300]}"
+                else:
+                    get_text = await resp_get.text()
+                    get_warning = f"GET {resp_get.status}: {get_text[:200]}"
 
-            payload = {"message": commit_message or "Add file via bot", "content": content_encoded}
+            payload = {
+                "message": commit_message or "Add file via bot",
+                "content": content_encoded
+            }
             if sha:
                 payload["sha"] = sha
             if branch:
@@ -792,38 +927,43 @@ async def upload_to_github(file_content: str, file_path: str, commit_message: st
                 if resp_put.status in (200, 201):
                     return True, None
                 elif resp_put.status == 401:
-                    return False, "GitHub token invalid/expired (401)"
+                    return False, "GitHub token invalid/expired (401). Re-check GIT_TOKEN."
                 elif resp_put.status == 403:
-                    return False, f"GitHub 403 Forbidden: {resp_text[:300]}"
+                    return False, f"GitHub 403 Forbidden — token likely missing 'repo' write scope.\nRepo: {owner}/{repo}\nDetail: {resp_text[:300]}"
                 elif resp_put.status == 404:
-                    return False, f"GitHub 404 — repo '{owner}/{repo}' not found"
+                    return False, f"GitHub 404 — repo '{owner}/{repo}' not found or token has no access to it.\nURL: {api_url}"
                 elif resp_put.status == 422:
-                    return False, f"GitHub 422 Unprocessable: {resp_text[:300]}"
+                    return False, f"GitHub 422 Unprocessable — possibly wrong branch or SHA conflict.\nDetail: {resp_text[:300]}"
                 else:
-                    return False, f"HTTP {resp_put.status}: {resp_text[:400]}"
+                    detail = f"HTTP {resp_put.status}\nURL: {api_url}\nResponse: {resp_text[:400]}"
+                    if get_warning:
+                        detail = f"GET warning: {get_warning}\n{detail}"
+                    return False, detail
 
     except Exception as e:
-        return False, f"Exception: {type(e).__name__}: {e}"
-
+        return False, f"Exception during upload: {type(e).__name__}: {e}"
 
 @StreamBot.on_message(filters.private & filters.user(list(Var.ADMIN_IDS)) & filters.command('batch'))
 async def batch_command(client: Client, message: Message):
     user_id = message.from_user.id
+    # Clear any previous session and start fresh
     _batch_sessions[user_id] = {'state': 'waiting_folder', 'data': {}}
     await message.reply_text(
         "📁 Enter the destination folder path:\n\n"
         "Format: path/to/folder\n"
-        "Example: 1234xxx/marrow/anatomy"
+        "Example: 1234xxx/marrow/anatomy\n\n"
+        "This is where JSON files will be uploaded."
     )
 
 
 @StreamBot.on_message(
     filters.private & filters.user(list(Var.ADMIN_IDS)) & filters.text
-    & ~filters.command(['batch', 'fbatch', 'fwd', 'start', 'gen', 'users', 'broadcast', 'ping', 'root', 'checkenv', 'ban', 'unban'])
+    & ~filters.command(['batch', 'fbatch', 'fwd', 'start', 'gen', 'users', 'broadcast', 'ping', 'root', 'checkenv'])
 )
 async def batch_conversation_handler(client: Client, message: Message):
     user_id = message.from_user.id
 
+    # ── /batch state machine ──────────────────────────────────────────────────
     batch_session = _batch_sessions.get(user_id)
     if batch_session:
         if batch_session['state'] == 'waiting_folder':
@@ -838,6 +978,9 @@ async def batch_conversation_handler(client: Client, message: Message):
                 "ANATOMY\n"
                 "F - https://t.me/c/2024354927/237364\n"
                 "L - https://t.me/c/2024354927/237366\n\n"
+                "BIOCHEMISTRY\n"
+                "F - https://t.me/c/2024354927/237460\n"
+                "L - https://t.me/c/2024354927/237462\n\n"
                 "Each subject should have F (first) and L (last) message links."
             )
         elif batch_session['state'] == 'waiting_links':
@@ -846,6 +989,7 @@ async def batch_conversation_handler(client: Client, message: Message):
             await _run_batch_processing(client, message, github_dest_folder)
         return
 
+    # ── /fbatch state machine ─────────────────────────────────────────────────
     fbatch_session = _fbatch_sessions.get(user_id)
     if fbatch_session:
         if fbatch_session['state'] == 'waiting_range':
@@ -853,15 +997,9 @@ async def batch_conversation_handler(client: Client, message: Message):
             await _run_fbatch_scan(client, message)
         return
 
-    fwd_session = _fwd_sessions.get(user_id)
-    if fwd_session:
-        if fwd_session['state'] == 'waiting_links':
-            del _fwd_sessions[user_id]
-            await _run_fwd_processing(client, message)
-        return
-
 
 async def _run_batch_processing(client: Client, message: Message, github_dest_folder: str):
+    """Run the actual batch processing after collecting both inputs."""
     try:
         links_text = message.text.strip()
         subjects_data = []
@@ -896,19 +1034,25 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
             })
 
         if not subjects_data:
-            await message.reply("❌ No valid subjects found. Check the format.")
+            await message.reply("❌ No valid subjects found in the input. Please check the format.")
             return
 
         git_token = os.environ.get('GIT_TOKEN', '')
         if not git_token:
             await message.reply(
                 "❌ GIT_TOKEN not found in environment variables.\n\n"
-                "Add your GitHub Personal Access Token with repo permissions."
+                "Please add your GitHub Personal Access Token with repo permissions:\n"
+                "1. Go to GitHub Settings → Developer settings → Personal access tokens\n"
+                "2. Generate new token (classic) with 'repo' scope\n"
+                "3. Add GIT_TOKEN to your environment variables"
             )
             return
 
+        # status_msg is used ONLY for progress — never edited to show errors
         status_msg = await message.reply_text(
-            f"🚀 Starting batch processing for {len(subjects_data)} subjects..."
+            f"🚀 Starting batch processing for {len(subjects_data)} subjects...\n"
+            f"📁 Repo: sunday2212/webreadme4\n"
+            f"📂 Folder: {github_dest_folder.split('/', 2)[2] if '/' in github_dest_folder else github_dest_folder}"
         )
 
         success_count = 0
@@ -931,10 +1075,12 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
 
                 if not f_msg_id or not s_msg_id:
                     fail_count += 1
+                    # Send as NEW message so it is never overwritten
                     await message.reply_text(
                         f"❌ [{idx}/{len(subjects_data)}] {subject_name}\n"
-                        f"Invalid message IDs — could not resolve:\n"
-                        f"F: {subject_info['first']}\nL: {subject_info['last']}"
+                        f"Invalid message IDs — could not resolve links:\n"
+                        f"F: {subject_info['first']}\n"
+                        f"L: {subject_info['last']}"
                     )
                     await status_msg.edit_text(
                         f"⏳ Progress: {idx}/{len(subjects_data)} | ✅ {success_count} | ❌ {fail_count}"
@@ -951,6 +1097,7 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
                 )
 
                 batch_size = 50
+                processed_count = 0
                 shared_thumbnail_url = None
                 thumb_warning = None
 
@@ -970,21 +1117,30 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
                                 messages.append(None)
 
                     for msg in messages:
+                        processed_count += 1
                         if not msg:
-                            skipped_messages.append({"id": "Unknown", "file_name": "Unknown", "reason": "Message not found"})
+                            skipped_messages.append({
+                                "id": "Unknown",
+                                "file_name": "Unknown",
+                                "reason": "Message not found"
+                            })
                             continue
+
                         thumbnail_folder = subject_name.lower().replace(" ", "_")
                         await process_message(msg, json_output, skipped_messages, thumbnail_folder, client, shared_thumbnail_url)
+
                         if json_output:
                             last_entry = json_output[-1]
                             if not shared_thumbnail_url and 'thumbnailUrl' in last_entry:
                                 shared_thumbnail_url = last_entry['thumbnailUrl']
+                                logging.info(f"✅ Thumbnail reused for remaining videos in {subject_name}: {shared_thumbnail_url}")
                             if not thumb_warning and '_thumb_error' in last_entry:
                                 thumb_warning = last_entry.pop('_thumb_error')
                             elif '_thumb_error' in last_entry:
                                 last_entry.pop('_thumb_error')
 
                 clean_output = [{k: v for k, v in e.items() if k != '_thumb_error'} for e in json_output]
+
                 output_data = {
                     "subjectName": subject_name.lower().replace(" ", ""),
                     "lectures": clean_output,
@@ -994,34 +1150,62 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
                 json_filename = f"{subject_name}.json"
                 json_content = json.dumps(output_data, indent=4, ensure_ascii=False)
                 github_file_path = f"{github_dest_folder}/{json_filename}".replace('//', '/')
-                upload_success, upload_error = await upload_to_github(json_content, github_file_path, f"Add {json_filename}", git_token)
+                commit_msg_json = f"Add {json_filename} - {len(clean_output)} lectures"
+
+                logging.info(f"Uploading JSON to GitHub: {github_file_path}")
+                upload_success, upload_error = await upload_to_github(
+                    json_content,
+                    github_file_path,
+                    commit_msg_json,
+                    git_token
+                )
 
                 html_filename = f"{subject_name}.html"
                 html_content = generate_lecture_html(json_filename, github_dest_folder)
                 github_html_path = f"{github_dest_folder}/{html_filename}".replace('//', '/')
-                html_upload_success, html_upload_error = await upload_to_github(html_content, github_html_path, f"Add {html_filename}", git_token)
+                logging.info(f"Uploading HTML to GitHub: {github_html_path}")
+                html_upload_success, html_upload_error = await upload_to_github(
+                    html_content,
+                    github_html_path,
+                    f"Add {html_filename}",
+                    git_token
+                )
 
                 if upload_success:
                     success_count += 1
+                    # Build success note with any warnings
                     notes = []
                     if thumb_warning:
                         notes.append(f"⚠️ Thumb: {thumb_warning[:150]}")
                     if not html_upload_success:
-                        notes.append(f"⚠️ HTML failed: {(html_upload_error or '')[:150]}")
+                        notes.append(f"⚠️ HTML upload failed: {(html_upload_error or '')[:150]}")
                     note_text = "\n" + "\n".join(notes) if notes else ""
                     await status_msg.edit_text(
                         f"✅ [{idx}/{len(subjects_data)}] {subject_name} done!\n"
-                        f"Lectures: {len(clean_output)} | Skipped: {len(skipped_messages)}{note_text}\n\n"
+                        f"Lectures: {len(clean_output)} | Skipped: {len(skipped_messages)}\n"
+                        f"JSON: ✅  HTML: {'✅' if html_upload_success else '❌'}"
+                        f"{note_text}\n\n"
                         f"Overall: ✅ {success_count} | ❌ {fail_count}"
                     )
                 else:
                     fail_count += 1
+                    error_detail = upload_error or "Unknown error"
+                    logging.error(f"GitHub JSON upload failed for {subject_name}: {error_detail}")
+                    # Send error as a NEW separate message — it will NOT be overwritten
                     await message.reply_text(
-                        f"❌ [{idx}/{len(subjects_data)}] {subject_name} — upload failed\n\n"
-                        f"📁 {github_file_path}\n🔍 {upload_error}"
+                        f"❌ [{idx}/{len(subjects_data)}] {subject_name} — JSON upload failed\n\n"
+                        f"📁 Path: {github_file_path}\n\n"
+                        f"🔍 Error:\n{error_detail}"
                     )
+                    if not html_upload_success and html_upload_error:
+                        logging.error(f"GitHub HTML upload also failed for {subject_name}: {html_upload_error}")
+                        await message.reply_text(
+                            f"❌ [{idx}/{len(subjects_data)}] {subject_name} — HTML upload also failed\n\n"
+                            f"📁 Path: {github_html_path}\n\n"
+                            f"🔍 Error:\n{html_upload_error}"
+                        )
                     await status_msg.edit_text(
-                        f"⏳ [{idx}/{len(subjects_data)}] {subject_name} failed\n"
+                        f"⏳ [{idx}/{len(subjects_data)}] {subject_name} failed — see error above\n\n"
                         f"Overall: ✅ {success_count} | ❌ {fail_count}"
                     )
 
@@ -1029,26 +1213,37 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
 
             except Exception as e:
                 fail_count += 1
-                logging.error(f"Exception processing {subject_name}: {e}", exc_info=True)
-                await message.reply_text(f"❌ [{idx}/{len(subjects_data)}] {subject_name}\n{type(e).__name__}: {e}")
+                err_text = f"{type(e).__name__}: {e}"
+                logging.error(f"Exception processing {subject_name}: {err_text}", exc_info=True)
+                # Send as NEW message so it stays visible
+                await message.reply_text(
+                    f"❌ [{idx}/{len(subjects_data)}] {subject_name} — Exception\n\n{err_text}"
+                )
                 await status_msg.edit_text(
-                    f"⏳ [{idx}/{len(subjects_data)}] {subject_name} failed\n"
+                    f"⏳ [{idx}/{len(subjects_data)}] {subject_name} failed — see error above\n\n"
                     f"Overall: ✅ {success_count} | ❌ {fail_count}"
                 )
                 continue
 
-        await message.reply_text(
+        # Final summary — always a new message so it appears after all error messages
+        summary = (
             f"🏁 Batch complete!\n"
             f"Total: {len(subjects_data)} | ✅ Success: {success_count} | ❌ Failed: {fail_count}"
         )
-        await status_msg.edit_text(f"✅ Done — {success_count}/{len(subjects_data)} uploaded.")
+        await message.reply_text(summary)
+        await status_msg.edit_text(f"✅ Done — {success_count}/{len(subjects_data)} uploaded successfully.")
 
     except Exception as e:
         logging.error(f"Fatal error in _run_batch_processing: {e}", exc_info=True)
         await message.reply(f"❌ Fatal error: {type(e).__name__}: {e}")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  /fbatch — Forum supergroup topic scanner
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _raw_chat(chat_id: int) -> str:
+    """Convert -1002932205861 → '2932205861' for t.me URL building."""
     s = str(abs(chat_id))
     return s[3:] if s.startswith("100") else s
 
@@ -1058,6 +1253,8 @@ def _supergroup_msg_url(chat_id: int, topic_id: int, msg_id: int) -> str:
 
 
 def _get_topic_id_from_msg(msg) -> "int | None":
+    """Extract forum topic ID from a Pyrogram/pyrofork Message.
+    Tries all known attribute paths across builds."""
     if getattr(msg, "forum_topic_created", None) is not None:
         return msg.id
     for attr in ("reply_to_top_message_id", "message_thread_id"):
@@ -1074,6 +1271,17 @@ def _get_topic_id_from_msg(msg) -> "int | None":
 
 
 def _parse_fbatch_range(raw: str):
+    """Parse 'START_LINK-END_LINK' input.
+
+    Supported link formats:
+      2-part: https://t.me/c/CHAT_ID/MSG_ID
+              → topic_id = msg_id (the number IS the topic creation msg ID)
+      3-part: https://t.me/c/CHAT_ID/TOPIC_ID/MSG_ID
+              → topic_id and msg_id are separate
+
+    Separator: '-' immediately before 'https'.
+    Returns (chat_id, start_topic, scan_start, end_topic, scan_end) or None.
+    """
     raw = raw.strip()
     parts = re.split(r'-(?=https?://)', raw, maxsplit=1)
     if len(parts) != 2:
@@ -1081,9 +1289,12 @@ def _parse_fbatch_range(raw: str):
     start_link, end_link = parts[0].strip(), parts[1].strip()
 
     def _extract(link: str):
+        """Return (chat_id, topic_id, msg_id) from a t.me/c link."""
+        # 3-part: CHAT/TOPIC/MSG
         m = re.match(r"https?://t\.me/c/(\d+)/(\d+)/(\d+)", link)
         if m:
             return int(f"-100{m.group(1)}"), int(m.group(2)), int(m.group(3))
+        # 2-part: CHAT/MSG — treat the single number as the topic ID too
         m = re.match(r"https?://t\.me/c/(\d+)/(\d+)", link)
         if m:
             n = int(m.group(2))
@@ -1092,12 +1303,15 @@ def _parse_fbatch_range(raw: str):
 
     s_chat, s_topic, s_msg = _extract(start_link)
     e_chat, e_topic, e_msg = _extract(end_link)
-    if s_chat is None or e_chat is None or s_chat != e_chat:
+    if s_chat is None or e_chat is None:
+        return None
+    if s_chat != e_chat:
         return None
     return s_chat, s_topic, s_msg, e_topic, e_msg
 
 
 async def _get_chat_latest_msg_id(client: Client, chat_id: int) -> int:
+    """Return the latest message ID in a chat, or 0 on failure."""
     try:
         async for msg in client.get_chat_history(chat_id, limit=1):
             return msg.id
@@ -1106,21 +1320,57 @@ async def _get_chat_latest_msg_id(client: Client, chat_id: int) -> int:
     return 0
 
 
-async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic, scan_end, status_msg):
-    topics = {}
-    valid_topic_ids = set()
+async def _scan_forum_topics(
+    client: Client,
+    chat_id: int,
+    start_topic: int,
+    scan_start: int,
+    end_topic: int,
+    scan_end: int,
+    status_msg,
+) -> "dict[int, dict]":
+    """
+    Two-phase forum topic scan.
+
+    Phase 1 — narrow pass over [start_topic, end_topic]:
+        Collect every forum_topic_created service message whose ID falls in that
+        range.  These IDs ARE the topic IDs.
+
+    Phase 2 — wide pass over [scan_start, wide_end]:
+        Fetch all regular (non-service) messages and group them by their
+        reply_to_top_message_id (= topic ID).  Only keeps topics discovered in
+        Phase 1.  Tracks the first and last content message for each topic.
+
+    Returns { topic_id: {'min': int, 'max': int, 'name': None} }
+    """
+    topics: dict = {}
+    valid_topic_ids: set = set()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # IMPORTANT: get_messages(chat_id, [ids]) does NOT populate
+    # forum_topic_created or reply_to_top_message_id in pyrofork when fetching
+    # by specific ID list.  get_chat_history() returns all message types with
+    # full attributes, so we use it for both phases.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # ── Phase 1: use get_chat_history to find topic-creation service messages ─
+    try:
+        await status_msg.edit_text(
+            f"🔍 Phase 1/2 — discovering topics {start_topic} → {end_topic}…"
+        )
+    except Exception:
+        pass
+
     phase1_end = max(end_topic, scan_end)
     phase1_limit = phase1_end - start_topic + 100
 
     try:
-        await status_msg.edit_text(f"🔍 Phase 1/2 — discovering topics {start_topic} → {end_topic}…")
-    except Exception:
-        pass
-
-    try:
-        async for msg in client.get_chat_history(chat_id, limit=phase1_limit, offset_id=phase1_end + 1):
+        async for msg in client.get_chat_history(
+            chat_id, limit=phase1_limit, offset_id=phase1_end + 1
+        ):
             if msg.id < start_topic:
                 break
+            # topic-creation service messages: their .id IS the topic ID
             is_topic_creation = (
                 getattr(msg, "forum_topic_created", None) is not None
                 or getattr(msg, "new_forum_topic", None) is not None
@@ -1129,25 +1379,40 @@ async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic
                 valid_topic_ids.add(msg.id)
                 topics[msg.id] = {"min": None, "max": None, "name": None}
     except Exception as exc:
-        logging.warning(f"fbatch phase1 error: {exc}")
+        logging.warning(f"fbatch phase1 get_chat_history error: {exc}")
 
+    if not valid_topic_ids:
+        logging.warning("fbatch: no topic-creation messages found in phase1; "
+                        "phase2 will use reply_to range-filter as fallback")
+
+    # ── Phase 2: scan wide range via get_chat_history, collect first/last msg ─
     latest_id = await _get_chat_latest_msg_id(client, chat_id)
     if latest_id <= 0:
         latest_id = scan_end + 3000
 
     wide_start = min(start_topic, scan_start)
-    wide_end = max(scan_end, latest_id)
+    wide_end   = max(scan_end, latest_id)
 
     try:
-        await status_msg.edit_text(f"🔍 Phase 2/2 — scanning {wide_start}→{wide_end}…")
+        await status_msg.edit_text(
+            f"🔍 Phase 2/2 — scanning {wide_start}→{wide_end} "
+            f"for {len(valid_topic_ids) or '?'} topic(s)…"
+        )
     except Exception:
         pass
 
+    # Iterate newest→oldest in chunks via get_chat_history
     offset_id = wide_end + 1
+    processed = 0
+    total_est = max(1, wide_end - wide_start + 1)
+    last_pct  = -10
+
     while offset_id > wide_start:
         batch = []
         try:
-            async for msg in client.get_chat_history(chat_id, limit=_FBATCH_CHUNK, offset_id=offset_id):
+            async for msg in client.get_chat_history(
+                chat_id, limit=_FBATCH_CHUNK, offset_id=offset_id
+            ):
                 batch.append(msg)
                 if msg.id <= wide_start:
                     break
@@ -1155,7 +1420,7 @@ async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic
             await asyncio.sleep(fw.value + 1)
             continue
         except Exception as exc:
-            logging.warning(f"fbatch phase2 error: {exc}")
+            logging.warning(f"fbatch phase2 get_chat_history error: {exc}")
             break
 
         if not batch:
@@ -1164,9 +1429,13 @@ async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic
         for msg in batch:
             if msg.id < wide_start:
                 continue
+
+            # Skip topic-creation service messages (no content)
             if (getattr(msg, "forum_topic_created", None) is not None
                     or getattr(msg, "new_forum_topic", None) is not None):
                 continue
+
+            # Skip other service/empty messages that carry no media or text
             has_content = bool(
                 msg.text or msg.media or msg.document or msg.video
                 or msg.audio or msg.photo or msg.voice
@@ -1174,13 +1443,17 @@ async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic
             )
             if not has_content:
                 continue
+
             tid = _get_topic_id_from_msg(msg)
             if tid is None:
                 continue
+
+            # Filter: Phase-1 topics take priority
             if valid_topic_ids:
                 if tid not in valid_topic_ids:
                     continue
             else:
+                # Fallback: accept any topic whose ID falls in [start, end]
                 if not (start_topic <= tid <= end_topic):
                     continue
 
@@ -1193,16 +1466,32 @@ async def _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic
                 if mid > topics[tid]["max"]:
                     topics[tid]["max"] = mid
 
+        processed += len(batch)
+        pct = min(99, processed * 100 // total_est)
+        if pct >= last_pct + 10:
+            last_pct = pct
+            active = sum(1 for v in topics.values() if v["min"] is not None)
+            try:
+                await status_msg.edit_text(
+                    f"🔍 Phase 2/2 — {pct}% (~{processed} msgs)\n"
+                    f"Topics with content: {active}"
+                )
+            except Exception:
+                pass
+
+        # Move the window: next batch starts just below the oldest msg in this batch
         oldest_id = batch[-1].id
         if oldest_id <= wide_start:
             break
         offset_id = oldest_id
         await asyncio.sleep(_FBATCH_DELAY)
 
+    # Drop any topic entries where no content message was found
     return {tid: info for tid, info in topics.items() if info["min"] is not None}
 
 
-async def _fetch_topic_names(client, chat_id, topics):
+async def _fetch_topic_names(client: Client, chat_id: int, topics: dict) -> None:
+    """Fetch topic title by reading the topic-header service message for each topic."""
     for tid in list(topics.keys()):
         try:
             msg = await client.get_messages(chat_id, tid)
@@ -1224,50 +1513,97 @@ async def fbatch_command(client: Client, message: Message):
     await message.reply_text(
         "📋 Forum Topic Scanner\n\n"
         "Send the **first topic link** and **last topic link** of the range:\n\n"
-        "FORMAT: FIRST_TOPIC_LINK-LAST_TOPIC_LINK\n\n"
-        "Example: `https://t.me/c/3950094573/5-https://t.me/c/3950094573/9`"
+        "FORMAT:  FIRST_TOPIC_LINK-LAST_TOPIC_LINK\n\n"
+        "2-part (topic creation link):\n"
+        "`https://t.me/c/3950094573/5-https://t.me/c/3950094573/9`\n\n"
+        "3-part (specific message in topic):\n"
+        "`https://t.me/c/2932205861/116/117-https://t.me/c/2932205861/1040/1642`\n\n"
+        "The bot will find all topics created between those two IDs, then scan "
+        "the entire chat history to find the first and last message in each topic."
     )
 
 
 async def _run_fbatch_scan(client: Client, message: Message):
+    """Core logic: parse range → 2-phase scan → build topic map → send result."""
     raw = message.text.strip()
+
     parsed = _parse_fbatch_range(raw)
     if not parsed:
         await message.reply_text(
-            "❌ Could not parse the link range.\n\n"
-            "Format: `https://t.me/c/CHATID/TOPIC1-https://t.me/c/CHATID/TOPIC2`"
+            "❌ Could not parse that link range.\n\n"
+            "Accepted formats:\n"
+            "• `https://t.me/c/CHATID/TOPIC1-https://t.me/c/CHATID/TOPIC2`\n"
+            "• `https://t.me/c/CHATID/TOPIC1/MSG1-https://t.me/c/CHATID/TOPIC2/MSG2`"
         )
         return
 
     chat_id, start_topic, scan_start, end_topic, scan_end = parsed
+
     if end_topic < start_topic:
         await message.reply_text("❌ End topic ID must be ≥ start topic ID.")
         return
 
     status_msg = await message.reply_text(
-        f"🔍 Forum Topic Scanner started\n"
-        f"Topics: {start_topic} → {end_topic}\n"
+        f"🔍 Forum Topic Scanner started\n\n"
+        f"Chat   : -100{_raw_chat(chat_id)}\n"
+        f"Topics : {start_topic} → {end_topic}\n"
+        f"Msgs   : {scan_start} → {scan_end}\n\n"
         f"⏳ Phase 1: discovering topics…"
     )
 
     try:
-        topics = await _scan_forum_topics(client, chat_id, start_topic, scan_start, end_topic, scan_end, status_msg)
+        topics = await _scan_forum_topics(
+            client, chat_id,
+            start_topic, scan_start,
+            end_topic, scan_end,
+            status_msg,
+        )
     except Exception as exc:
         logging.error(f"fbatch scan error: {exc}", exc_info=True)
         await status_msg.edit_text(f"❌ Scan failed: {type(exc).__name__}: {exc}")
         return
 
     if not topics:
-        await status_msg.edit_text(f"⚠️ No forum topics found in range {start_topic} → {end_topic}.")
+        await status_msg.edit_text(
+            f"⚠️ No forum topics found in range {start_topic} → {end_topic}.\n\n"
+            "• Confirm the bot can read this supergroup.\n"
+            "• Confirm Topics are enabled in the group.\n"
+            "• All messages in range may be deleted."
+        )
         return
 
     try:
-        await status_msg.edit_text(f"✅ Found {len(topics)} topic(s) — fetching names…")
+        await status_msg.edit_text(
+            f"✅ Found {len(topics)} topic(s) — fetching names…"
+        )
         await _fetch_topic_names(client, chat_id, topics)
     except Exception as exc:
         logging.warning(f"fbatch name fetch error: {exc}")
 
+    # ── Build output ──────────────────────────────────────────────────────────
     sorted_topics = sorted(topics.items(), key=lambda kv: kv[0])
+
+    header_lines = [
+        f"✅ {len(topics)} topics found in topic range {start_topic} → {end_topic}",
+        f"{'─' * 50}",
+        "",
+    ]
+
+    topic_blocks = []
+    for tid, info in sorted_topics:
+        name = info["name"] or f"Topic {tid}"
+        f_link = _supergroup_msg_url(chat_id, tid, info["min"])
+        l_link = _supergroup_msg_url(chat_id, tid, info["max"])
+        topic_blocks.append(
+            f"{name}\n"
+            f"F - {f_link}\n"
+            f"L - {l_link}"
+        )
+
+    full_text = "\n".join(header_lines) + "\n\n".join(topic_blocks)
+
+    # ── Send as groups of topics (batch-style: name:- F_link-L_link) ─────────
+    # Group messages so each fits in one Telegram message
     group_lines = [f"✅ {len(topics)} topics | range {start_topic}→{end_topic}\n"]
     for tid, info in sorted_topics:
         name = info["name"] or f"Topic {tid}"
@@ -1275,6 +1611,7 @@ async def _run_fbatch_scan(client: Client, message: Message):
         l_link = _supergroup_msg_url(chat_id, tid, info["max"])
         group_lines.append(f"{name}:- {f_link}-{l_link}")
 
+    # Split into chunks that fit Telegram's 4096-char limit
     chunk_msgs = []
     current_chunk = []
     current_len = 0
@@ -1296,25 +1633,19 @@ async def _run_fbatch_scan(client: Client, message: Message):
         except Exception as exc:
             logging.error(f"fbatch send chunk error: {exc}")
 
+    # ── Also send as .txt file ────────────────────────────────────────────────
     import tempfile, os as _os
-    full_lines = [f"✅ {len(topics)} topics found | range {start_topic} → {end_topic}\n"]
-    for tid, info in sorted_topics:
-        name = info["name"] or f"Topic {tid}"
-        f_link = _supergroup_msg_url(chat_id, tid, info["min"])
-        l_link = _supergroup_msg_url(chat_id, tid, info["max"])
-        full_lines.append(f"{name}\nF - {f_link}\nL - {l_link}")
-    full_text = "\n\n".join(full_lines)
-
     tmp_path = None
     try:
         fd, tmp_path = tempfile.mkstemp(suffix=".txt", prefix="fbatch_")
         _os.close(fd)
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(full_text)
+        caption = f"✅ {len(topics)} topics | range {start_topic}→{end_topic}"
         await client.send_document(
             chat_id=message.chat.id,
             document=tmp_path,
-            caption=f"✅ {len(topics)} topics | range {start_topic}→{end_topic}",
+            caption=caption,
             file_name=f"topics_{_raw_chat(chat_id)}_{start_topic}_{end_topic}.txt"
         )
     except Exception as exc:
@@ -1332,18 +1663,34 @@ async def _run_fbatch_scan(client: Client, message: Message):
         pass
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+
 def parse_tme_link(link: str):
+    """Parse a t.me/c link — supports both channel and supergroup (topic) links.
+    
+    Channel:    https://t.me/c/CHAT_ID/MSG_ID          → (chat_id, msg_id)
+    Supergroup: https://t.me/c/CHAT_ID/TOPIC_ID/MSG_ID → (chat_id, msg_id)
+
+    Returns (chat_id_int, msg_id_int) or raises ValueError.
+    """
     link = link.strip()
+    # 3-part path first (supergroup with topic): CHAT/TOPIC/MSG
     m3 = re.match(r"https?://t\.me/c/(\d+)/(\d+)/(\d+)", link)
     if m3:
-        return int(f"-100{m3.group(1)}"), int(m3.group(3))
+        chat_id = int(f"-100{m3.group(1)}")
+        msg_id = int(m3.group(3))
+        return chat_id, msg_id
+    # 2-part path (regular channel): CHAT/MSG
     m2 = re.match(r"https?://t\.me/c/(\d+)/(\d+)", link)
     if m2:
-        return int(f"-100{m2.group(1)}"), int(m2.group(2))
+        chat_id = int(f"-100{m2.group(1)}")
+        msg_id = int(m2.group(2))
+        return chat_id, msg_id
     raise ValueError(f"Cannot parse link: {link}")
 
 
 def db_channel_short_id(db_channel: int) -> str:
+    """Convert -1002024354927 → '2024354927' for use in t.me links."""
     s = str(db_channel)
     if s.startswith("-100"):
         return s[4:]
@@ -1352,21 +1699,23 @@ def db_channel_short_id(db_channel: int) -> str:
 
 @StreamBot.on_message(filters.private & filters.user(list(Var.ADMIN_IDS)) & filters.command('fwd'))
 async def fwd_command(client: Client, message: Message):
-    user_id = message.from_user.id
-    _fwd_sessions[user_id] = {'state': 'waiting_links'}
-    await message.reply_text(
-        "📝 Send subjects with F/L links from the *source* channel:\n\n"
-        "Format:\n"
-        "SubjectName\n"
-        "F - https://t.me/c/SOURCE/237\n"
-        "L - https://t.me/c/SOURCE/251\n\n"
-        "Bot must be admin in the source channel."
-    )
-
-
-async def _run_fwd_processing(client: Client, message: Message):
+    """Forward messages from a source channel to the DB channel and return new F/L links."""
     try:
-        links_text = message.text.strip()
+        links_msg = await client.ask(
+            text="📝 Send subjects with F/L links from the *source* channel:\n\n"
+                 "cbbanatomy\n"
+                 "F - https://t.me/c/SOURCE_CHANNEL/237\n"
+                 "L - https://t.me/c/SOURCE_CHANNEL/251\n\n"
+                 "cbbpyt\n"
+                 "F - https://t.me/c/SOURCE_CHANNEL/460\n"
+                 "L - https://t.me/c/SOURCE_CHANNEL/469\n\n"
+                 "Bot must be admin in the source channel.",
+            chat_id=message.from_user.id,
+            filters=filters.text,
+            timeout=120
+        )
+
+        links_text = links_msg.text.strip()
         subjects_data = []
         current_subject = None
         current_first = None
@@ -1378,7 +1727,11 @@ async def _run_fwd_processing(client: Client, message: Message):
                 continue
             if not line.startswith('F -') and not line.startswith('L -'):
                 if current_subject and current_first and current_last:
-                    subjects_data.append({'subject': current_subject, 'first': current_first, 'last': current_last})
+                    subjects_data.append({
+                        'subject': current_subject,
+                        'first': current_first,
+                        'last': current_last
+                    })
                 current_subject = line
                 current_first = None
                 current_last = None
@@ -1388,13 +1741,20 @@ async def _run_fwd_processing(client: Client, message: Message):
                 current_last = line.replace('L -', '').strip()
 
         if current_subject and current_first and current_last:
-            subjects_data.append({'subject': current_subject, 'first': current_first, 'last': current_last})
+            subjects_data.append({
+                'subject': current_subject,
+                'first': current_first,
+                'last': current_last
+            })
 
         if not subjects_data:
-            await message.reply("❌ No valid subjects found.")
+            await message.reply("❌ No valid subjects found. Check the format and try again.")
             return
 
-        status_msg = await message.reply_text(f"🚀 Starting forward of {len(subjects_data)} subject(s)...")
+        status_msg = await message.reply_text(
+            f"🚀 Starting forward of {len(subjects_data)} subject(s) to DB channel..."
+        )
+
         db_short = db_channel_short_id(Var.DB_CHANNEL)
         result_lines = []
 
@@ -1403,6 +1763,7 @@ async def _run_fwd_processing(client: Client, message: Message):
             try:
                 src_chat_id, first_msg_id = parse_tme_link(subject_info['first'])
                 _, last_msg_id = parse_tme_link(subject_info['last'])
+
                 start_id = min(first_msg_id, last_msg_id)
                 end_id = max(first_msg_id, last_msg_id)
                 total = end_id - start_id + 1
@@ -1416,17 +1777,23 @@ async def _run_fwd_processing(client: Client, message: Message):
                 fwd_last_id = None
                 forwarded_count = 0
                 failed_count = 0
-                skipped_count = 0
+                skipped_count = 0   # service/empty messages — not a real failure
                 first_error = None
 
+                # Forward one message at a time — batch forwarding fails entirely
+                # if any single message in the batch is missing/deleted.
                 for msg_id in range(start_id, end_id + 1):
                     try:
+                        # ── Pre-fetch to detect and skip service/empty messages ──
                         src_msg = await client.get_messages(src_chat_id, msg_id)
+
                         if src_msg is None or getattr(src_msg, 'empty', True):
                             skipped_count += 1
                             await asyncio.sleep(0.2)
                             continue
 
+                        # Service messages (topic creation, pinned, etc.) can't be
+                        # copied — skip silently so they don't pollute failed_count
                         has_content = bool(
                             src_msg.text or src_msg.media or src_msg.document
                             or src_msg.video or src_msg.audio or src_msg.photo
@@ -1438,6 +1805,7 @@ async def _run_fwd_processing(client: Client, message: Message):
                             await asyncio.sleep(0.2)
                             continue
 
+                        # ── Copy the message to DB channel ──────────────────────
                         copied = await client.copy_message(
                             chat_id=Var.DB_CHANNEL,
                             from_chat_id=src_chat_id,
@@ -1451,6 +1819,11 @@ async def _run_fwd_processing(client: Client, message: Message):
                                 fwd_last_id = copied.id
                             forwarded_count += 1
                         else:
+                            # copy_message returned but no valid ID — treat as failure
+                            err_str = f"copy_message returned no ID for msg {msg_id}"
+                            logging.warning(err_str)
+                            if first_error is None:
+                                first_error = err_str
                             failed_count += 1
 
                         await asyncio.sleep(0.3)
@@ -1458,7 +1831,11 @@ async def _run_fwd_processing(client: Client, message: Message):
                     except FloodWait as e:
                         await asyncio.sleep(e.value + 2)
                         try:
-                            copied = await client.copy_message(chat_id=Var.DB_CHANNEL, from_chat_id=src_chat_id, message_id=msg_id)
+                            copied = await client.copy_message(
+                                chat_id=Var.DB_CHANNEL,
+                                from_chat_id=src_chat_id,
+                                message_id=msg_id
+                            )
                             if copied and getattr(copied, 'id', None):
                                 if fwd_first_id is None or copied.id < fwd_first_id:
                                     fwd_first_id = copied.id
@@ -1466,34 +1843,61 @@ async def _run_fwd_processing(client: Client, message: Message):
                                     fwd_last_id = copied.id
                                 forwarded_count += 1
                         except Exception as retry_err:
+                            err_str = f"{type(retry_err).__name__}: {retry_err}"
+                            logging.error(f"Retry failed msg {msg_id} in {subject_name}: {err_str}")
                             if first_error is None:
-                                first_error = str(retry_err)
+                                first_error = err_str
                             failed_count += 1
                     except Exception as msg_err:
+                        err_str = f"{type(msg_err).__name__}: {msg_err}"
+                        logging.error(f"Copy error msg {msg_id} in {subject_name}: {err_str}")
                         if first_error is None:
-                            first_error = str(msg_err)
+                            first_error = err_str
                         failed_count += 1
 
+                    # Update status every 20 messages
                     if (msg_id - start_id + 1) % 20 == 0:
                         await status_msg.edit_text(
-                            f"📤 {subject_name}: {forwarded_count} copied, {skipped_count} skipped\n"
-                            f"Progress: {msg_id - start_id + 1}/{total}"
+                            f"📤 {subject_name}: {forwarded_count} copied, "
+                            f"{skipped_count} skipped, {failed_count} failed\n"
+                            f"Progress: {msg_id - start_id + 1}/{total} | "
+                            f"Subject {idx}/{len(subjects_data)}"
                         )
 
                 if fwd_first_id and fwd_last_id:
                     f_link = f"https://t.me/c/{db_short}/{fwd_first_id}"
                     l_link = f"https://t.me/c/{db_short}/{fwd_last_id}"
-                    result_lines.append(f"{subject_name}\nF - {f_link}\nL - {l_link}")
+                    result_lines.append(
+                        f"{subject_name}\n"
+                        f"F - {f_link}\n"
+                        f"L - {l_link}"
+                    )
                     await status_msg.edit_text(
                         f"✅ {subject_name} done!\n"
                         f"Copied: {forwarded_count} | Skipped: {skipped_count} | Failed: {failed_count}\n"
-                        f"F - {f_link}\nL - {l_link}\n\nProgress: {idx}/{len(subjects_data)}"
+                        f"F - {f_link}\n"
+                        f"L - {l_link}\n\n"
+                        f"Progress: {idx}/{len(subjects_data)}"
                     )
                 else:
-                    result_lines.append(f"{subject_name}\n❌ No messages forwarded")
+                    if first_error:
+                        error_hint = f"\n🔍 Error: {first_error}"
+                    elif skipped_count == total:
+                        error_hint = (
+                            f"\n🔍 All {skipped_count} messages were service/empty messages "
+                            f"(topic creation, pinned notices, etc.) — no media to forward.\n"
+                            f"Use the correct F/L links pointing to actual media messages."
+                        )
+                    else:
+                        error_hint = (
+                            f"\n🔍 {skipped_count} skipped (service msgs), "
+                            f"{failed_count} failed — check bot permissions in source chat."
+                        )
+                    result_lines.append(f"{subject_name}\n❌ No messages forwarded{error_hint}")
                     await status_msg.edit_text(
                         f"❌ {subject_name}: nothing forwarded\n"
-                        f"Skipped: {skipped_count} | Failed: {failed_count}\n"
+                        f"Attempted: {total} | Skipped: {skipped_count} | Failed: {failed_count}"
+                        f"{error_hint}\n\n"
                         f"Progress: {idx}/{len(subjects_data)}"
                     )
 
@@ -1502,10 +1906,17 @@ async def _run_fwd_processing(client: Client, message: Message):
             except Exception as e:
                 logging.error(f"Error forwarding {subject_name}: {e}", exc_info=True)
                 result_lines.append(f"{subject_name}\n❌ Error: {str(e)}")
+                await status_msg.edit_text(
+                    f"❌ Error on {subject_name}: {str(e)}\n\n"
+                    f"Progress: {idx}/{len(subjects_data)}"
+                )
 
+        # Send final summary with all new F/L links
         final_text = "✅ Forward complete! New DB channel links:\n\n" + "\n\n".join(result_lines)
         await message.reply_text(final_text, disable_web_page_preview=True)
 
+    except asyncio.TimeoutError:
+        await message.reply("⏱️ Request timeout. Please try again.")
     except Exception as e:
         await message.reply(f"❌ Error: {str(e)}")
 
@@ -1513,22 +1924,33 @@ async def _run_fwd_processing(client: Client, message: Message):
 @StreamBot.on_message((filters.private) & (filters.document | filters.audio | filters.photo), group=3)
 async def private_receive_handler(c: Client, m: Message):
     try:
+        # Create intermediate link instead of immediate stream generation
         intermediate_link, caption = await create_intermediate_link(m)
+        
+        # Create button with intermediate link
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("GENERATE STREAM 🎬", url=intermediate_link)]])
+        
+        # Send response with intermediate link
         response_text = f"📁 <b>{caption}</b>\n\n🔗 Click the button below to generate your stream link:"
         await m.reply_text(text=response_text, reply_markup=reply_markup, disable_web_page_preview=True, quote=True)
+        
     except Exception as e:
         await m.reply_text(f"❌ Error processing file: {str(e)}", quote=True)
         print(f"Error in private_receive_handler: {e}")
 
-
-@StreamBot.on_message((filters.private) & (filters.video | filters.audio), group=4)
+@StreamBot.on_message((filters.private) & (filters.video | filters.audio | filters.photo), group=4)
 async def private_receive_handler_video(c: Client, m: Message):
     try:
+        # Create intermediate link instead of immediate stream generation
         intermediate_link, caption = await create_intermediate_link(m)
+        
+        # Create button with intermediate link
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("GENERATE STREAM 🎬", url=intermediate_link)]])
+        
+        # Send response with intermediate link
         response_text = f"🎥 <b>{caption}</b>\n\n🔗 Click the button below to generate your stream link:"
         await m.reply_text(text=response_text, reply_markup=reply_markup, disable_web_page_preview=True, quote=True)
+        
     except Exception as e:
         await m.reply_text(f"❌ Error processing file: {str(e)}", quote=True)
         print(f"Error in private_receive_handler_video: {e}")
