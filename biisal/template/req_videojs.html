@@ -6,11 +6,6 @@
     <title>{{ file_name }}</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway|Delius">
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5920367457745298"
-         crossorigin="anonymous"></script>
-    <!-- Google IMA SDK (for video ads) -->
-    <script type="text/javascript" src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -37,68 +32,15 @@
         .vjs-control-bar { background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important; }
         .vjs-big-play-button { border-radius: 50% !important; width: 2em !important; height: 2em !important; line-height: 2em !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
         .vjs-quality-button .vjs-icon-placeholder::before { content: 'HD'; font-size: 1.5em; line-height: 1.67; }
-        
-        /* Ad Container Styling */
-        #ad-container {
-            width: 100%;
-            max-width: 100%;
-            margin: 0 auto;
-            background: rgba(0,0,0,0.95);
-            border-bottom: 2px solid #333;
-            padding: 10px 0;
-            min-height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            color: #999;
-        }
-        
-        #ad-container.active {
-            min-height: 250px;
-            padding: 15px 0;
-        }
-        
-        .ad-label {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        /* Ad Skip Button */
-        .ima-ad-container {
-            position: relative;
-        }
-
-        .ad-countdown {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            color: #fff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            z-index: 100;
-            font-weight: bold;
-        }
 
         @media (max-width: 768px) { 
             marquee { font-size: 14px; } 
             .tap-indicator { font-size: 48px; }
-            #ad-container.active { min-height: 200px; }
         }
     </style>
 </head>
 <body>
     <header><marquee><div id="file-name">{{ file_name }}</div></marquee></header>
-
-    <!-- Ad Container (Pre-roll & Mid-roll) -->
-    <div id="ad-container" class="ima-ad-container">
-        <div class="ad-label" id="ad-label"></div>
-        <div id="google-ima-ads-container"></div>
-        <div id="ad-countdown" class="ad-countdown" style="display:none;"></div>
-    </div>
 
     <div class="container">
         <video id="player" 
@@ -124,25 +66,6 @@
         const container = document.querySelector('.container');
         const isVideo = playerElement.tagName.toLowerCase() === 'video';
         let lastTapTime = 0, lastTapSide = null;
-
-        // ─────────────────────────────────────────
-        // AD CONFIGURATION
-        // ─────────────────────────────────────────
-        const AD_CONFIG = {
-            // Pre-roll ad (plays before video starts)
-            preRollEnabled: true,
-            // Mid-roll ads - trigger at specific video timestamps (in seconds)
-            midRollEnabled: true,
-            midRollTriggers: [300, 900], // At 5min (300s) and 15min (900s)
-            // Google IMA VAST tags (using AdSense fallback)
-            vastTag: 'https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/124319096/example/video&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_prefix=pre&url=[referrer_url]&is_unviewed=1&scp=1&npa=0&vpmute=1'
-        };
-
-        // IMA Ad Manager
-        let adsManager = null;
-        let adsLoader = null;
-        let midRollTriggered = [];
-        let preRollPlayed = false;
 
         // Custom Quality Button Logic
         const QualityButton = videojs.extend(videojs.getComponent('MenuButton'), {
@@ -184,147 +107,6 @@
             }
         });
 
-        // ──────────────────��──────────────────────
-        // AD INITIALIZATION (Google IMA SDK)
-        // ─────────────────────────────────────────
-        function initializeAds() {
-            try {
-                if (!google.ima) {
-                    console.warn('Google IMA SDK not loaded');
-                    return;
-                }
-
-                // Create ads loader
-                adsLoader = new google.ima.AdsLoader.forPlayer(player.el().querySelector('video'), {
-                    onAdsManagerLoaded: onAdsManagerLoaded,
-                    onAdsLoadError: onAdsLoadError
-                });
-
-                // Listen for player events
-                player.on('play', function() {
-                    if (AD_CONFIG.preRollEnabled && !preRollPlayed) {
-                        preRollPlayed = true;
-                        requestAds(AD_CONFIG.vastTag, 'pre-roll');
-                    }
-                });
-
-                // Mid-roll ad triggers
-                if (AD_CONFIG.midRollEnabled) {
-                    player.on('timeupdate', function() {
-                        const currentTime = Math.floor(player.currentTime());
-                        
-                        AD_CONFIG.midRollTriggers.forEach(trigger => {
-                            if (currentTime === trigger && !midRollTriggered.includes(trigger)) {
-                                midRollTriggered.push(trigger);
-                                console.log('Mid-roll ad triggered at ' + trigger + 's');
-                                if (adsLoader && !adsManager) {
-                                    requestAds(AD_CONFIG.vastTag, 'mid-roll');
-                                }
-                            }
-                        });
-                    });
-                }
-
-            } catch (e) {
-                console.error('IMA SDK initialization error:', e);
-            }
-        }
-
-        function requestAds(vastTag, adType) {
-            try {
-                if (!adsLoader) return;
-                
-                const adsRequest = new google.ima.AdsRequest();
-                adsRequest.adTagUrl = vastTag;
-                
-                console.log('Requesting ' + adType + ' ads...');
-                adsLoader.requestAds(adsRequest);
-            } catch (e) {
-                console.error('Error requesting ads:', e);
-            }
-        }
-
-        function onAdsManagerLoaded(adsManagerLoadedEvent) {
-            try {
-                const adsRenderingSettings = new google.ima.AdsRenderingSettings();
-                adsRenderingSettings.restoreCustomPlaybackStateOnAdBreakComplete = true;
-                adsRenderingSettings.autoAlign = true;
-                adsRenderingSettings.muted = false;
-
-                adsManager = adsManagerLoadedEvent.getAdsManager(player.el().querySelector('video'), adsRenderingSettings);
-
-                // Ad events
-                adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED, onAdEvent);
-                adsManager.addEventListener(google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, onAdEvent);
-                adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, onAdEvent);
-                adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, onAdError);
-                adsManager.addEventListener(google.ima.AdEvent.Type.AD_BREAK_READY, onAdEvent);
-
-                try {
-                    adsManager.init(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL);
-                    adsManager.start();
-                    updateAdContainer('active', '🎬 Ad Loading...');
-                } catch (e) {
-                    console.error('Error initializing ads manager:', e);
-                    player.play();
-                }
-            } catch (e) {
-                console.error('Error in onAdsManagerLoaded:', e);
-            }
-        }
-
-        function onAdEvent(adEvent) {
-            try {
-                switch (adEvent.type) {
-                    case google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED:
-                        player.pause();
-                        updateAdContainer('active', '🎬 Playing Advertisement...');
-                        console.log('Ad started - pausing content');
-                        break;
-                    case google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED:
-                        player.play();
-                        updateAdContainer('inactive', '');
-                        console.log('Ad ended - resuming content');
-                        break;
-                    case google.ima.AdEvent.Type.ALL_ADS_COMPLETED:
-                        console.log('All ads completed');
-                        updateAdContainer('inactive', '');
-                        break;
-                }
-            } catch (e) {
-                console.error('Error in ad event handler:', e);
-            }
-        }
-
-        function onAdsLoadError(adsLoadError) {
-            console.warn('Ads load error:', adsLoadError);
-            updateAdContainer('inactive', '');
-            player.play();
-        }
-
-        function onAdError(adErrorEvent) {
-            console.error('Ad error:', adErrorEvent.getError());
-            updateAdContainer('inactive', '');
-            if (adsManager) {
-                try {
-                    adsManager.destroy();
-                    adsManager = null;
-                } catch (e) {}
-            }
-            player.play();
-        }
-
-        function updateAdContainer(state, text) {
-            const container = document.getElementById('ad-container');
-            const label = document.getElementById('ad-label');
-            if (state === 'active') {
-                container.classList.add('active');
-            } else {
-                container.classList.remove('active');
-            }
-            if (label) label.textContent = text;
-        }
-
         // ─────────────────────────────────────────
         // PLAYER CONTROLS & INTERACTIONS
         // ─────────────────────────────────────────
@@ -363,29 +145,8 @@
         }
 
         player.ready(() => {
-            // Initialize ads on player ready
-            initializeAds();
-            
             playerElement.addEventListener('touchstart', handleTap, { passive: true });
             playerElement.addEventListener('click', handleTap);
-        });
-
-        // Cleanup on player dispose
-        player.on('dispose', () => {
-            if (adsManager) {
-                try {
-                    adsManager.destroy();
-                } catch (e) {}
-            }
-        });
-
-        // Handle resize
-        window.addEventListener('resize', () => {
-            if (adsManager) {
-                try {
-                    adsManager.resize(window.innerWidth, window.innerHeight, google.ima.ViewMode.NORMAL);
-                } catch (e) {}
-            }
         });
     })();
     </script>
