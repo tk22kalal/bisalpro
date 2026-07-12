@@ -108,7 +108,8 @@
             playsinline 
             controlsList="nodownload" 
             oncontextmenu="return false;"
-            crossorigin="anonymous">
+            crossorigin="anonymous"
+            {% if poster_url %}poster="{{ poster_url }}"{% endif %}>
             <source src="{{ file_url }}" type="application/x-mpegURL">
         </video>
     </div>
