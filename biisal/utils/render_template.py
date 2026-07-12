@@ -36,6 +36,10 @@ async def render_page(id, secure_hash, src=None, player=None):
     file_size = humanbytes(file_data.file_size)
     display_name = clean_name.replace("_", " ")
 
+    poster_url = ""
+    if tag == "video" and getattr(file_data, "has_thumb", False):
+        poster_url = urllib.parse.urljoin(Var.URL, f"thumb/{id}?hash={secure_hash}")
+
     if tag in ("video", "audio"):
         if player == "videojs":
             template_file = "biisal/template/req_videojs.html"
@@ -54,4 +58,5 @@ async def render_page(id, secure_hash, src=None, player=None):
         file_unique_id=file_data.unique_id,
         tag=tag,
         player=player or "plyr",
+        poster_url=poster_url,
     )
