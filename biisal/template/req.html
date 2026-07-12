@@ -73,9 +73,10 @@
             display: none !important;
         }
 
-        /* REMOVED: Thumbnail/Poster display */
+        /* Poster shown while the video loads, instead of a black screen */
         .plyr__poster {
-            display: none !important;
+            background-size: cover;
+            background-position: center;
         }
 
         .plyr__controls {
@@ -131,6 +132,7 @@
                 controlslist="nodownload noremoteplayback"
                 disablepictureinpicture="false"
                 preload="auto"
+                {% if poster_url %}poster="{{ poster_url }}"{% endif %}
                 oncontextmenu="return false;">
             </video>
         </div>
