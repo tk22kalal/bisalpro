@@ -15,7 +15,6 @@ from pyrogram.errors import FloodWait
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from biisal.utils.file_properties import get_name, get_hash, get_media_from_message
 from helper_func import encode, get_message_id, decode, get_messages
-from biisal.utils.thumbnail_extractor import extract_thumbnail_from_middle
 from biisal.utils.github_uploader import upload_image_to_github
 
 db = Database(Var.DATABASE_URL, Var.name)
@@ -98,7 +97,7 @@ async def create_intermediate_link(message: Message):
     
     return intermediate_link, caption
 
-async def create_intermediate_link_for_batch(message: Message, folder_name: str = None, client: Client = None, shared_thumbnail_url: str = None):
+async def create_intermediate_link_for_batch(message: Message, folder_name: str = None, client: Client = None):
     """Create intermediate links for batch processing - both stream and download, with optional thumbnail.
     
     DOMAIN INDEPENDENCE: Each deployment generates links ONLY for its own domain.
@@ -137,72 +136,58 @@ async def create_intermediate_link_for_batch(message: Message, folder_name: str 
             'file_unique_id': getattr(media, 'file_unique_id', '')
         }
         
-        # Extract and upload thumbnail for video files BEFORE storing in database
+        # Grab and upload the poster for video files BEFORE storing in database.
+        # Uses Telegram's own embedded video thumbnail (already attached to the message
+        # metadata at upload time) instead of downloading the full video and running
+        # ffmpeg on it — this is a few KB and near-instant per video, vs. downloading
+        # the whole video and extracting a frame.
         mime_type = getattr(media, 'mime_type', '')
-        thumbnail_url = shared_thumbnail_url  # Use shared thumbnail if provided
-        
-        # Log thumbnail processing conditions
-        logging.info(f"Thumbnail check - mime_type: {mime_type}, folder_name: {folder_name}, THUMB_API: {'Present' if THUMB_API else 'Missing'}, client: {'Present' if client else 'Missing'}, shared_thumbnail: {'Present' if shared_thumbnail_url else 'None'}")
-        
-        # Only extract thumbnail if we don't have a shared one AND this is a video
-        if not shared_thumbnail_url and mime_type and mime_type.startswith('video/') and folder_name and THUMB_API and client:
-            temp_video_path = None
-            thumbnail_path = None
-            try:
-                logging.info(f"🎬 Starting thumbnail extraction for video: {caption}")
-                logging.info(f"   Video mime type: {mime_type}")
-                logging.info(f"   Folder name: {folder_name}")
-                
-                # Download video temporarily
-                temp_dir = Path("/tmp/batch_videos")
-                temp_dir.mkdir(exist_ok=True)
-                import secrets as sec
-                temp_video_path = str(temp_dir / f"video_{sec.token_hex(8)}.mp4")
-                
-                logging.info(f"   Downloading video to: {temp_video_path}")
-                # Download the video file
-                await client.download_media(message, file_name=temp_video_path)
-                
-                video_size = os.path.getsize(temp_video_path) if os.path.exists(temp_video_path) else 0
-                logging.info(f"   Video downloaded successfully ({video_size} bytes)")
-                
-                # Extract thumbnail from middle of video
-                logging.info(f"   Extracting thumbnail from video...")
-                thumbnail_path = await extract_thumbnail_from_middle(temp_video_path)
-                
-                thumb_size = os.path.getsize(thumbnail_path) if os.path.exists(thumbnail_path) else 0
-                logging.info(f"   Thumbnail extracted successfully: {thumbnail_path} ({thumb_size} bytes)")
-                
-                # Upload thumbnail to GitHub
-                logging.info(f"   Uploading thumbnail to GitHub (folder: {folder_name})...")
-                thumbnail_url = await upload_image_to_github(
-                    image_path=thumbnail_path,
-                    github_token=THUMB_API,
-                    folder_name=folder_name,
-                    title_name=caption
-                )
-                
-                logging.info(f"✅ Thumbnail uploaded successfully: {thumbnail_url}")
-                    
-            except Exception as thumb_error:
-                thumb_err_str = str(thumb_error)
-                logging.error(f"❌ Thumbnail failed for '{caption}': {thumb_err_str}", exc_info=True)
-                # Store the first thumbnail error so the batch loop can report it to the bot
-                if not message_data.get('_thumb_error'):
-                    message_data['_thumb_error'] = thumb_err_str
-            finally:
-                # Always cleanup temporary files, even on failure
+        thumbnail_url = None
+
+        logging.info(f"Thumbnail check - mime_type: {mime_type}, folder_name: {folder_name}, THUMB_API: {'Present' if THUMB_API else 'Missing'}, client: {'Present' if client else 'Missing'}")
+
+        if mime_type and mime_type.startswith('video/') and folder_name and THUMB_API and client:
+            thumbs = getattr(media, 'thumbs', None)
+            if thumbs:
+                temp_thumb_path = None
                 try:
-                    if temp_video_path and os.path.exists(temp_video_path):
-                        os.remove(temp_video_path)
-                        logging.debug(f"Cleaned up temp video: {temp_video_path}")
-                    if thumbnail_path and os.path.exists(thumbnail_path):
-                        os.remove(thumbnail_path)
-                        logging.debug(f"Cleaned up thumbnail: {thumbnail_path}")
-                except Exception as cleanup_error:
-                    logging.error(f"Error cleaning up temp files: {cleanup_error}")
+                    logging.info(f"🖼️  Fetching embedded Telegram thumbnail for: {caption}")
+
+                    temp_dir = Path("/tmp/batch_thumbs")
+                    temp_dir.mkdir(exist_ok=True)
+                    import secrets as sec
+                    temp_thumb_path = str(temp_dir / f"thumb_{sec.token_hex(8)}.jpg")
+
+                    # Download only the small embedded thumbnail, not the full video
+                    await client.download_media(thumbs[-1].file_id, file_name=temp_thumb_path)
+
+                    thumb_size = os.path.getsize(temp_thumb_path) if os.path.exists(temp_thumb_path) else 0
+                    logging.info(f"   Thumbnail fetched ({thumb_size} bytes)")
+
+                    logging.info(f"   Uploading thumbnail to GitHub (folder: {folder_name})...")
+                    thumbnail_url = await upload_image_to_github(
+                        image_path=temp_thumb_path,
+                        github_token=THUMB_API,
+                        folder_name=folder_name,
+                        title_name=caption
+                    )
+
+                    logging.info(f"✅ Thumbnail uploaded successfully: {thumbnail_url}")
+
+                except Exception as thumb_error:
+                    thumb_err_str = str(thumb_error)
+                    logging.error(f"❌ Thumbnail failed for '{caption}': {thumb_err_str}", exc_info=True)
+                    if not message_data.get('_thumb_error'):
+                        message_data['_thumb_error'] = thumb_err_str
+                finally:
+                    try:
+                        if temp_thumb_path and os.path.exists(temp_thumb_path):
+                            os.remove(temp_thumb_path)
+                    except Exception as cleanup_error:
+                        logging.error(f"Error cleaning up temp thumbnail: {cleanup_error}")
+            else:
+                logging.info(f"⏭️  No embedded thumbnail on message for {caption}; skipping poster")
         else:
-            # Log why thumbnail extraction was skipped
             reasons = []
             if not mime_type or not mime_type.startswith('video/'):
                 reasons.append(f"not a video (mime: {mime_type})")
@@ -313,7 +298,7 @@ async def create_pdf_download_links(message: Message):
         }
 
 
-async def process_message(msg, json_output, skipped_messages, folder_name=None, client=None, shared_thumbnail_url=None):
+async def process_message(msg, json_output, skipped_messages, folder_name=None, client=None):
     """Process individual message and create intermediate link (updated for new system with thumbnail support)"""
     try:
         # Silently skip plain text messages (no media at all)
@@ -332,7 +317,7 @@ async def process_message(msg, json_output, skipped_messages, folder_name=None, 
             return
 
         # Videos / audio / other documents → full streaming + download links
-        intermediate_data = await create_intermediate_link_for_batch(msg, folder_name, client, shared_thumbnail_url)
+        intermediate_data = await create_intermediate_link_for_batch(msg, folder_name, client)
         json_output.append(intermediate_data)
 
     except Exception as e:
@@ -1098,7 +1083,6 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
 
                 batch_size = 50
                 processed_count = 0
-                shared_thumbnail_url = None
                 thumb_warning = None
 
                 for batch_start in range(start_id, end_id + 1, batch_size):
@@ -1127,13 +1111,10 @@ async def _run_batch_processing(client: Client, message: Message, github_dest_fo
                             continue
 
                         thumbnail_folder = subject_name.lower().replace(" ", "_")
-                        await process_message(msg, json_output, skipped_messages, thumbnail_folder, client, shared_thumbnail_url)
+                        await process_message(msg, json_output, skipped_messages, thumbnail_folder, client)
 
                         if json_output:
                             last_entry = json_output[-1]
-                            if not shared_thumbnail_url and 'thumbnailUrl' in last_entry:
-                                shared_thumbnail_url = last_entry['thumbnailUrl']
-                                logging.info(f"✅ Thumbnail reused for remaining videos in {subject_name}: {shared_thumbnail_url}")
                             if not thumb_warning and '_thumb_error' in last_entry:
                                 thumb_warning = last_entry.pop('_thumb_error')
                             elif '_thumb_error' in last_entry:
