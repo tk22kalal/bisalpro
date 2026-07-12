@@ -19,7 +19,7 @@ from ..utils.time_format import get_readable_time
 from ..utils.custom_dl import ByteStreamer
 from biisal.utils.render_template import render_page
 from biisal.utils.database import Database
-from biisal.utils.file_properties import get_name, get_hash
+from biisal.utils.file_properties import get_name, get_hash, get_media_from_message
 from biisal.utils.human_readable import humanbytes
 from biisal.vars import Var
 
@@ -325,6 +325,49 @@ async def stream_handler(request: web.Request):
     except Exception as e:
         logging.critical(e.with_traceback(None))
         raise web.HTTPInternalServerError(text=str(e))
+
+
+@routes.get(r"/thumb/{id}", allow_head=True)
+async def thumb_handler(request: web.Request):
+    """Serve Telegram's own embedded video thumbnail (metadata already attached to the
+    message) as a fast poster image, instead of extracting a frame with ffmpeg."""
+    try:
+        id = int(request.match_info["id"])
+        secure_hash = request.rel_url.query.get("hash")
+
+        message = await StreamBot.get_messages(int(Var.BIN_CHANNEL), id)
+        if not message or message.empty:
+            raise FIleNotFound
+
+        media = get_media_from_message(message)
+        if not media:
+            raise FIleNotFound
+
+        unique_id = getattr(media, "file_unique_id", "") or ""
+        if not secure_hash or unique_id[:6] != secure_hash:
+            raise InvalidHash
+
+        thumbs = getattr(media, "thumbs", None)
+        if not thumbs:
+            raise web.HTTPNotFound(text="No thumbnail available for this file")
+
+        thumb_bytes = await StreamBot.download_media(thumbs[-1].file_id, in_memory=True)
+        data = thumb_bytes.getvalue() if hasattr(thumb_bytes, "getvalue") else thumb_bytes
+
+        return web.Response(
+            body=data,
+            content_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    except InvalidHash:
+        raise web.HTTPForbidden(text="Invalid hash")
+    except FIleNotFound:
+        raise web.HTTPNotFound(text="File not found")
+    except web.HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error in thumb_handler: {e}")
+        raise web.HTTPInternalServerError(text="Error loading thumbnail")
 
 
 @routes.get(r"/{path:.+}", allow_head=True)
