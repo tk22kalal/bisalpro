@@ -31,6 +31,7 @@ class ByteStreamer:
         self.clean_timer = 30 * 60
         self.client: Client = client
         self.cached_file_ids: Dict[int, FileId] = {}
+        self._session_locks: Dict[int, asyncio.Lock] = {}
         asyncio.create_task(self.clean_cache())
 
     async def get_file_properties(self, id: int) -> FileId:
@@ -64,9 +65,23 @@ class ByteStreamer:
         This is required for getting the bytes from Telegram servers.
         """
 
+        # Fast path: session already cached, no lock needed
         media_session = client.media_sessions.get(file_id.dc_id, None)
+        if media_session is not None:
+            logging.debug(f"Using cached media session for DC {file_id.dc_id}")
+            return media_session
 
-        if media_session is None:
+        # Slow path: acquire a per-DC lock so only one coroutine calls
+        # ExportAuthorization at a time, preventing FLOOD_WAIT spam.
+        if file_id.dc_id not in self._session_locks:
+            self._session_locks[file_id.dc_id] = asyncio.Lock()
+        async with self._session_locks[file_id.dc_id]:
+            # Re-check inside the lock in case another coroutine already created it
+            media_session = client.media_sessions.get(file_id.dc_id, None)
+            if media_session is not None:
+                logging.debug(f"Using cached media session for DC {file_id.dc_id} (post-lock)")
+                return media_session
+
             if file_id.dc_id != await client.storage.dc_id():
                 media_session = Session(
                     client,
@@ -110,8 +125,6 @@ class ByteStreamer:
                 await media_session.start()
             logging.debug(f"Created media session for DC {file_id.dc_id}")
             client.media_sessions[file_id.dc_id] = media_session
-        else:
-            logging.debug(f"Using cached media session for DC {file_id.dc_id}")
         return media_session
 
 
