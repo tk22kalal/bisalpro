@@ -2060,56 +2060,58 @@ media-container {
 /* ---------- Central Play/Pause Button (YouTube style) ---------- */
 /* ---------- Central Play/Pause Button (YouTube style, perfectly centred) ---------- */
 /* ---------- Central Play/Pause Button (YouTube style, perfectly centred) ---------- */
+/* ---------- Central Play/Pause Button (YouTube style, perfectly centred) ---------- */
 .center-play-button {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 15;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
-  color: white;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-  display: grid;
-  place-items: center; /* Center content both axes */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    color: white;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    display: grid;                 /* Grid ensures perfect centering */
+    place-items: center;           /* Center content both axes */
 }
 
 /* Show button when controls are visible */
 .media-controls[data-visible] ~ .center-play-button {
-  opacity: 1;
-  pointer-events: auto;
+    opacity: 1;
+    pointer-events: auto;
 }
 
-/* Icons: always present in layout, faded in/out (so opacity transition works) */
+/* Hide ALL icons by default */
 .center-play-button .media-icon--restart,
 .center-play-button .media-icon--play,
 .center-play-button .media-icon--pause {
-  display: block;
-  opacity: 0;
-  pointer-events: none;
-  grid-area: 1 / 1; /* Overlap in the single grid cell */
-  width: 36px;
-  height: 36px;
-  transition: opacity 0.15s ease;
+    display: none;
+    opacity: 0;
 }
 
-/* State-driven visibility – only the correct icon appears */
+/* State‑driven visibility – only the correct icon appears */
 .center-play-button[data-ended] .media-icon--restart,
 .center-play-button:not([data-ended])[data-paused] .media-icon--play,
 .center-play-button:not([data-ended]):not([data-started]) .media-icon--play,
 .center-play-button[data-started]:not([data-paused]):not([data-ended]) .media-icon--pause {
-  opacity: 1;
+    display: block;
+    opacity: 1;
 }
 
-/* Optical centering fix for the play triangle only */
-.center-play-button .media-icon--play {
-  transform: translateX(2px); /* nudge right to correct visual centroid */
+/* All icons sit in the same grid cell, perfectly centred */
+.center-play-button .media-icon {
+    position: absolute;
+    top: 60%;
+    left: 60%;
+    width: 36px;
+    height: 36px;
+    grid-area: 1 / 1;              /* Overlap in the single grid cell */
 }
     </style>
 </head>
