@@ -7,8 +7,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
     <!-- Video.js CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <!-- hls.js -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -40,6 +38,7 @@
             border-radius: 12px 12px 0 0;
             margin-bottom: -8px;
             overflow: hidden;
+            z-index: 2;
         }
 
         .file-name-marquee {
@@ -66,27 +65,25 @@
             border-radius: 0 0 12px 12px;
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            background: #000;
         }
 
-        /* Video.js custom skin – dark & clean */
+        /* Video.js Custom Styling */
         .video-js {
             width: 100%;
-            height: auto;
             aspect-ratio: 16 / 9;
-            background-color: #000;
-            border-radius: 0 0 12px 12px;
-        }
-        .video-js .vjs-control-bar {
-            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
-        }
-        .video-js .vjs-big-play-button {
-            display: none !important;   /* removed the big centre play icon */
+            font-family: 'Raleway', sans-serif;
         }
 
-        /* Poster shown while loading */
-        .vjs-poster {
-            background-size: cover;
-            background-position: center;
+        /* Hide big middle play button as requested */
+        .vjs-big-play-button {
+            display: none !important;
+        }
+
+        /* Customize control bar */
+        .vjs-control-bar {
+            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%) !important;
+            height: 3.5em !important;
         }
 
         .loading {
@@ -128,165 +125,114 @@
         </div>
 
         <div class="player-wrapper">
-            <!-- Video element – Video.js will use this -->
-            <video id="player" class="video-js vjs-default-skin" 
-                   controls playsinline crossorigin="anonymous"
-                   preload="auto"
-                   {% if poster_url %}poster="{{ poster_url }}"{% endif %}
-                   oncontextmenu="return false;">
+            <video 
+                id="player" 
+                class="video-js vjs-default-skin vjs-big-play-centered" 
+                controls 
+                preload="auto" 
+                playsinline
+                oncontextmenu="return false;">
+                <source src="{{ file_url }}" type="application/x-mpegURL">
             </video>
         </div>
     </div>
 
-    <!-- Video.js library -->
+    <!-- Video.js Script -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
 
     <script>
-        // ---- Prevent context menu & selection ----
+        // Disable Right Click and Selection
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('selectstart', e => e.preventDefault());
 
-        // ---- Prevent long-press context menu on mobile ----
-        let longPressTimer;
-        document.addEventListener('touchstart', e => { longPressTimer = setTimeout(() => e.preventDefault(), 500); });
-        document.addEventListener('touchend',   () => clearTimeout(longPressTimer));
-        document.addEventListener('touchmove',  () => clearTimeout(longPressTimer));
-
-        // ---- Video source ----
-        const videoSource = "{{ file_url }}";
-        const isHLS = videoSource.includes('.m3u8');
-
-        // ---- Get video element ----
-        const videoElement = document.getElementById('player');
-
-        // ---- Initialize Video.js ----
+        // Initialize Video.js
         const player = videojs('player', {
-            controls: true,
-            bigPlayButton: false,                 // removed as requested
-            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            playbackRates: [0.5, 1, 1.25, 1.5, 2],
+            fluid: true,
+            responsive: true,
             controlBar: {
-                skipBackward: 10,                 // 10s rewind button
-                skipForward: 10,                  // 10s forward button
                 children: [
                     'playToggle',
-                    'skipBackward',
-                    'skipForward',
-                    'progressControl',
+                    'volumePanel',
                     'currentTimeDisplay',
+                    'timeDivider',
                     'durationDisplay',
+                    'progressControl',
                     'playbackRateMenuButton',
-                    'pictureInPictureToggle',
-                    'fullscreenToggle'
-                ]
+                    'subsCapsButton',
+                    'qualitySelector',
+                    'fullscreenToggle',
+                ],
             },
-            fullscreen: {
-                options: { iosNative: true }      // best iOS fullscreen
-            },
-            autoplay: false,
-            muted: false,
-            preload: 'auto'
         });
 
-        // ---- Hide loading spinner ----
+        const videoElement = document.getElementById('player_html5_api');
+        const loadingScreen = document.getElementById('loading');
+
         function hideLoading() {
-            setTimeout(() => document.getElementById('loading').classList.add('hidden'), 500);
+            setTimeout(() => loadingScreen.classList.add('hidden'), 500);
         }
 
-        // ---- Handle HLS vs direct source (exactly as before) ----
+        // Hide loader when video is ready
+        player.on('canplay', hideLoading);
+
+        // Error Handling
         let errorRetryCount = 0;
-
-        if (isHLS && Hls.isSupported()) {
-            const hls = new Hls({
-                enableWorker: true,
-                backBufferLength: 90,
-                maxBufferLength: 30,
-                maxBufferSize: 60 * 1000 * 1000,
-                manifestLoadingTimeOut: 10000,
-                manifestLoadingMaxRetry: 3,
-                fragLoadingTimeOut: 20000,
-                fragLoadingMaxRetry: 6
-            });
-            hls.loadSource(videoSource);
-            hls.attachMedia(videoElement);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => hideLoading());
-            hls.on(Hls.Events.ERROR, (e, data) => {
-                if (data.fatal) {
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR && errorRetryCount < 3) {
-                        errorRetryCount++;
-                        hls.startLoad();
-                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls.recoverMediaError();
-                    } else {
-                        hls.destroy();
-                    }
-                }
-            });
-            window.hls = hls;
-        } else {
-            videoElement.src = videoSource;
-            videoElement.addEventListener('loadedmetadata', hideLoading);
-        }
-
-        // ---- Double‑tap seek (converted to Video.js API) ----
-        let lastTapTime = 0, lastTapX = 0;
-        videoElement.addEventListener('click', function(e) {
-            const now = Date.now();
-            if (now - lastTapTime < 300 && Math.abs(e.clientX - lastTapX) < 50) {
-                const rect = videoElement.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const current = player.currentTime();
-                if (x < rect.width / 3) {
-                    player.currentTime(Math.max(0, current - 10));
-                } else if (x > rect.width * 2 / 3) {
-                    const dur = player.duration();
-                    player.currentTime(Math.min(dur, current + 10));
-                }
-                lastTapTime = 0;
-            } else {
-                lastTapTime = now;
-                lastTapX = e.clientX;
-            }
-        });
-
-        let lastTouchTime = 0, lastTouchX = 0;
-        videoElement.addEventListener('touchend', function(e) {
-            const now = Date.now();
-            const touch = e.changedTouches[0];
-            if (now - lastTouchTime < 300 && Math.abs(touch.clientX - lastTouchX) < 50) {
-                const rect = videoElement.getBoundingClientRect();
-                const x = touch.clientX - rect.left;
-                const current = player.currentTime();
-                if (x < rect.width / 3) {
-                    player.currentTime(Math.max(0, current - 10));
-                } else if (x > rect.width * 2 / 3) {
-                    const dur = player.duration();
-                    player.currentTime(Math.min(dur, current + 10));
-                }
-                lastTouchTime = 0;
-            } else {
-                lastTouchTime = now;
-                lastTouchX = touch.clientX;
-            }
-        });
-
-        // ---- Error recovery ----
-        player.on('error', function() {
+        player.on('error', () => {
             if (errorRetryCount < 3) {
                 errorRetryCount++;
                 setTimeout(() => {
-                    videoElement.load();
+                    player.src({ src: "{{ file_url }}", type: 'application/x-mpegURL' });
+                    player.load();
                     player.play();
                 }, 2000);
             }
         });
 
-        // ---- Prevent keyboard shortcuts for saving ----
+        // Double Click / Double Tap Skip Logic
+        let lastTapTime = 0;
+        let lastTapX = 0;
+
+        const handleDoubleTap = (clientX) => {
+            const now = Date.now();
+            const rect = player.el().getBoundingClientRect();
+            const x = clientX - rect.left;
+
+            if (now - lastTapTime < 300 && Math.abs(clientX - lastTapX) < 50) {
+                // Determine Left or Right side
+                if (x < rect.width / 3) {
+                    // Skip backward
+                    player.currentTime(Math.max(0, player.currentTime() - 10));
+                } else if (x > (rect.width * 2) / 3) {
+                    // Skip forward
+                    player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
+                }
+                lastTapTime = 0; // Reset
+            } else {
+                lastTapTime = now;
+                lastTapX = clientX;
+            }
+        };
+
+        // Desktop Double Click
+        player.on('click', (e) => {
+            handleDoubleTap(e.clientX);
+        });
+
+        // Mobile Double Tap
+        player.on('touchend', (e) => {
+            handleDoubleTap(e.changedTouches[0].clientX);
+        });
+
+        // Prevention for save-as
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) e.preventDefault();
         });
 
-        // ---- Prevent drag ----
-        videoElement.addEventListener('dragstart', e => e.preventDefault());
+        // Auto-hide loading if video takes too long to trigger 'canplay'
+        setTimeout(() => {
+            if (!loadingScreen.classList.contains('hidden')) hideLoading();
+        }, 5000);
     </script>
 </body>
 </html>
