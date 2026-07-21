@@ -220,16 +220,18 @@
 
   <div class="video-container" id="playerContainer">
 
-    <!-- VideoJS element — HLS source, controls disabled via JS init -->
+    <!-- VideoJS element — direct byte-range stream, autoplay muted -->
     <video id="player"
       class="video-js"
       preload="auto"
+      autoplay
+      muted
       playsinline
       controlsList="nodownload"
       oncontextmenu="return false;"
       crossorigin="anonymous"
       {% if poster_url %}poster="{{ poster_url }}"{% endif %}>
-      <source src="{{ file_url }}" type="application/x-mpegURL">
+      <source src="{{ file_url }}" type="{{ mime_type or 'video/mp4' }}">
     </video>
 
     <!-- Top gradient -->
@@ -238,6 +240,18 @@
     <!-- Buffer spinner -->
     <div class="buffer-overlay" id="bufferSpinner">
       <div class="spinner"></div>
+    </div>
+
+    <!-- Unmute overlay — hidden until autoplay fires muted -->
+    <div id="unmuteOverlay" style="
+      position:absolute; bottom:70px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.75); color:#fff; font-size:14px; font-weight:600;
+      padding:10px 20px; border-radius:30px; z-index:50; cursor:pointer;
+      display:none; align-items:center; gap:8px; white-space:nowrap;
+      border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(4px);
+    ">
+      <svg viewBox="0 0 24 24" width="18" fill="#fff"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      Tap to unmute
     </div>
 
     <!-- Settings gear (top-right) -->
@@ -251,7 +265,6 @@
     <div class="settings-menu" id="setMenu">
       <div id="mainMenuView" class="menu-view">
         <div class="menu-item" id="openSpeed">Speed <span id="currentSpeedLabel">1x</span></div>
-        <div class="menu-item" id="openQuality">Quality <span id="currentQualityLabel">Auto</span></div>
         <div class="menu-item" id="pipOption">Picture-in-Picture</div>
       </div>
 
@@ -278,16 +291,6 @@
           <button class="pill" data-val="2.0">2.0</button>
           <button class="pill" data-val="3.0">3.0</button>
         </div>
-      </div>
-
-      <!-- Quality sub-view -->
-      <div id="qualityView" class="speed-view">
-        <div class="speed-top-nav">
-          <button class="back-btn" id="backToMenuFromQuality">
-            <svg viewBox="0 0 24 24" width="22" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-          </button>
-        </div>
-        <div id="qualityList" style="padding: 4px 0;"></div>
       </div>
     </div>
 
@@ -323,36 +326,50 @@
     </div>
   </div>
 
-  <!-- VideoJS + Quality Levels plugin -->
+  <!-- VideoJS (direct byte-range streaming, no HLS/quality-levels plugin needed) -->
   <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@4.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
   <script>
   (function () {
     'use strict';
 
-    // ── VIDEOJS INIT (HLS, no built-in controls) ──────────────────────────────
+    // ── VIDEOJS INIT (direct byte-range stream, no HLS/VHS needed) ────────────
     const player = videojs('player', {
       controls: false,
       nativeControlsForTouch: false,
       html5: {
-        vhs: { overrideNative: false, enableLowInitialPlaylist: true }
+        nativeVideoTracks: true,
+        nativeAudioTracks: true,
+        nativeTextTracks: true
       }
     });
 
-    const container    = document.getElementById('playerContainer');
-    const progBar      = document.getElementById('progBar');
-    const currTimeEl   = document.getElementById('currTime');
-    const durEl        = document.getElementById('durEl');
-    const setBtn       = document.getElementById('setBtn');
-    const setMenu      = document.getElementById('setMenu');
-    const centerPlay   = document.getElementById('centerPlay');
-    const playIcon     = document.getElementById('playIcon');
-    const speedRange   = document.getElementById('speedRange');
+    const container     = document.getElementById('playerContainer');
+    const progBar       = document.getElementById('progBar');
+    const currTimeEl    = document.getElementById('currTime');
+    const durEl         = document.getElementById('durEl');
+    const setBtn        = document.getElementById('setBtn');
+    const setMenu       = document.getElementById('setMenu');
+    const centerPlay    = document.getElementById('centerPlay');
+    const playIcon      = document.getElementById('playIcon');
+    const speedRange    = document.getElementById('speedRange');
     const bufferSpinner = document.getElementById('bufferSpinner');
-    const volIcon      = document.getElementById('volIcon');
+    const volIcon       = document.getElementById('volIcon');
+    const unmuteOverlay = document.getElementById('unmuteOverlay');
 
     let hideTimer;
+
+    // ── UNMUTE OVERLAY (shown when autoplay starts muted) ────────────────────
+    function doUnmute() {
+      player.muted(false);
+      volIcon.style.opacity = 1;
+      unmuteOverlay.style.display = 'none';
+    }
+    unmuteOverlay.addEventListener('click', e => { e.stopPropagation(); doUnmute(); });
+    // Unmute on the very first deliberate tap/click anywhere on the player
+    container.addEventListener('pointerdown', () => {
+      if (player.muted()) doUnmute();
+    }, { once: true });
 
     // ── SECURITY: DISABLE RIGHT-CLICK & LONG-PRESS ───────────────────────────
     container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
@@ -385,9 +402,12 @@
       if (!player.paused()) hideTimer = setTimeout(hideUI, 3500);
     }
 
-    player.on('play',  () => {
+    player.on('play', () => {
+      // Update icon to pause symbol
       playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="black"/>';
       resetHideTimer();
+      // Show unmute overlay if autoplay fired with muted audio
+      if (player.muted()) unmuteOverlay.style.display = 'flex';
     });
     player.on('pause', () => {
       playIcon.innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>';
@@ -506,8 +526,8 @@
     document.addEventListener('click', () => setMenu.classList.remove('active'));
 
     function showView(viewId) {
-      ['mainMenuView', 'speedView', 'qualityView'].forEach(id => {
-        document.getElementById(id).style.display = id === viewId ? (id === 'mainMenuView' ? 'block' : 'block') : 'none';
+      ['mainMenuView', 'speedView'].forEach(id => {
+        document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
       });
     }
 
@@ -515,9 +535,6 @@
       e.stopPropagation(); showView('speedView');
     });
     document.getElementById('backToMenu').addEventListener('click', e => {
-      e.stopPropagation(); showView('mainMenuView');
-    });
-    document.getElementById('backToMenuFromQuality').addEventListener('click', e => {
       e.stopPropagation(); showView('mainMenuView');
     });
 
@@ -537,48 +554,6 @@
     document.querySelectorAll('.pill').forEach(btn => btn.addEventListener('click', e => {
       e.stopPropagation(); updateSpeed(btn.dataset.val);
     }));
-
-    // ── QUALITY CONTROL (via quality-levels plugin) ───────────────────────────
-    document.getElementById('openQuality').addEventListener('click', e => {
-      e.stopPropagation();
-      const levels = player.qualityLevels();
-      const list = document.getElementById('qualityList');
-      list.innerHTML = '';
-
-      const makeItem = (label, onClick, isCurrent) => {
-        const div = document.createElement('div');
-        div.className = 'menu-item';
-        div.style.cssText = 'justify-content:flex-start; gap:10px;';
-        div.innerHTML = `<span style="color:${isCurrent ? '#ff5722' : '#fff'}">${isCurrent ? '✓' : '　'}</span><span>${label}</span>`;
-        div.addEventListener('click', e => { e.stopPropagation(); onClick(); showView('mainMenuView'); });
-        list.appendChild(div);
-      };
-
-      // Auto option
-      let currentIsAuto = true;
-      for (let i = 0; i < levels.length; i++) {
-        if (!levels[i].enabled) { currentIsAuto = false; break; }
-      }
-
-      makeItem('Auto', () => {
-        for (let i = 0; i < levels.length; i++) levels[i].enabled = true;
-        document.getElementById('currentQualityLabel').textContent = 'Auto';
-      }, currentIsAuto);
-
-      const heights = [];
-      for (let i = 0; i < levels.length; i++) {
-        if (levels[i].height && !heights.includes(levels[i].height)) heights.push(levels[i].height);
-      }
-      heights.sort((a, b) => b - a).forEach(h => {
-        const isCur = !currentIsAuto && levels[0] && levels[0].height === h;
-        makeItem(h + 'p', () => {
-          for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === h);
-          document.getElementById('currentQualityLabel').textContent = h + 'p';
-        }, isCur);
-      });
-
-      showView('qualityView');
-    });
 
     // ── PICTURE-IN-PICTURE ───────────────────────────────────────────────────
     document.getElementById('pipOption').addEventListener('click', e => {
