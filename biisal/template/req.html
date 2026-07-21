@@ -5,33 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     
-    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
     
     <style>
-        /* ----- Custom Page Styles (minimal) ----- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: #000;               /* Pure black, like native player */
+            background: #000;
             font-family: 'Raleway', sans-serif;
             color: white;
-            min-height: 100vh;
-            overflow: hidden;               /* No scrollbars, video fills viewport */
+            height: 100vh;
+            overflow: hidden;
             -webkit-user-select: none;
             user-select: none;
         }
 
-        /* Player wrapper – full width, no rounded corners, no extra shadow */
         .player-wrapper {
             position: relative;
             width: 100%;
-            height: 100vh;                  /* Fill the entire viewport */
+            height: 100vh;
             background: #000;
             overflow: hidden;
         }
 
-        /* Title overlay – transparent background, subtle text shadow */
+        /* Title overlay – transparent, on top of the video */
         .file-info {
             position: absolute;
             top: 0;
@@ -39,19 +36,19 @@
             right: 0;
             z-index: 5;
             padding: 16px 24px;
-            background: transparent;        /* No background */
+            background: transparent;
             font-family: 'Delius', cursive;
             font-size: 18px;
             font-weight: 600;
             color: #fff;
             text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-            pointer-events: none;           /* Allows clicks to pass through to the player */
+            pointer-events: none;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        /* Loading overlay (unchanged) */
+        /* Loading spinner */
         .loading {
             position: fixed;
             inset: 0;
@@ -80,11 +77,10 @@
             }
         }
 
-        /* =================================================================
-           PLACE THE ENTIRE player.css CONTENT BELOW
-           (the long CSS you provided, starting from
-           "/* -------------------------------------------------------------------------- */")
-           ================================================================= */
+        /* =========================================
+           INSERT THE COMPLETE player.css HERE
+           (everything from the first comment to the end)
+           ========================================= */
         /* -------------------------------------------------------------------------- */
 /* Global styles for the host document, outside of the Shadow DOM             */
 /* -------------------------------------------------------------------------- */
@@ -2005,25 +2001,19 @@ media-container {
 </head>
 <body>
 
-    <!-- Loading spinner -->
     <div class="loading" id="loader"><div class="spinner"></div></div>
 
     <div class="player-wrapper">
-        <!-- Title overlay (no background, no marquee, just static) -->
         <div class="file-info">{{ file_name }}</div>
 
-        <!-- Modern video-player custom element (minimal UI) -->
         <video-player>
             <media-container class="media-minimal-skin media-minimal-skin--video">
-                <!-- Video element (source will be set by JS) -->
                 <video playsinline preload="auto"></video>
 
-                <!-- Buffering indicator -->
                 <media-buffering-indicator class="media-buffering-indicator">
                     <media-icon name="spinner" family="minimal" class="media-icon"></media-icon>
                 </media-buffering-indicator>
 
-                <!-- Error dialog -->
                 <media-error-dialog class="media-error">
                     <div class="media-error__dialog">
                         <div class="media-error__content">
@@ -2036,7 +2026,6 @@ media-container {
                     </div>
                 </media-error-dialog>
 
-                <!-- Controls (full minimal UI template) -->
                 <media-controls class="media-controls">
                     <media-tooltip-group>
                         <div class="media-button-group">
@@ -2121,6 +2110,7 @@ media-container {
                                 <media-icon name="gear" family="minimal" class="media-icon media-icon--settings"></media-icon>
                             </button>
                             <media-menu id="settings-menu" side="top" align="center" class="media-popover media-menu media-menu--settings">
+                                <!-- (full settings menu – same as earlier) -->
                                 <media-menu-view class="media-menu__panel">
                                     <div class="media-menu__group">
                                         <media-menu-item commandfor="settings-quality-menu" type="quality" data-setting="quality" class="media-menu__item media-menu__item--submenu">
@@ -2158,6 +2148,7 @@ media-container {
                                     </div>
                                 </media-menu-view>
 
+                                <!-- submenus ... (abbreviated for brevity; use the full ones from previous answer) -->
                                 <media-menu id="settings-quality-menu" class="media-menu__panel">
                                     <media-menu-back class="media-menu__back">
                                         <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
@@ -2341,9 +2332,9 @@ media-container {
         </video-player>
     </div>
 
-    <!-- HLS support (for .m3u8 streams) -->
+    <!-- HLS support -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <!-- Video.js Minimal UI Module -->
+    <!-- The custom element module – needs a web server to load -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video-minimal-ui.js"></script>
     
     <script>
@@ -2372,7 +2363,6 @@ media-container {
             }
 
             if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
-                // HLS stream
                 const hls = new Hls();
                 hls.loadSource(videoUrl);
                 hls.attachMedia(video);
@@ -2395,7 +2385,6 @@ media-container {
                     }
                 });
             } else {
-                // MP4 or native supported format
                 video.src = videoUrl;
                 if (video.readyState >= 2) {
                     onReady();
@@ -2405,7 +2394,7 @@ media-container {
             }
         });
 
-        // Fallback: hide loader after 8 seconds even if the player hasn't reported ready
+        // Fallback loader hide
         setTimeout(() => {
             if (!loader.classList.contains('hidden')) {
                 hideLoader();
