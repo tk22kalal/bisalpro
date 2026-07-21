@@ -5,29 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     
-    <!-- Video.js Base CSS -->
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Delius&display=swap" rel="stylesheet">
-    
-    <style>
-        :root {
-            --vjs-theme-color: #ffffff;
-            --control-bg: rgba(20, 20, 20, 0.6);
-            --blur-effect: blur(12px);
-            --border-radius: 24px;
-        }
+    <!-- Vidstack Library (Modern Web Components) -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video-minimal-ui.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Delius&display=swap" rel="stylesheet">
 
+    <style>
+        /* Your Custom Page Layout */
         body {
             margin: 0;
             padding: 0;
-            background: #050505;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
             font-family: 'Inter', sans-serif;
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             overflow: hidden;
         }
 
@@ -37,237 +30,246 @@
             position: relative;
         }
 
-        /* File Name Styling */
-        .header-info {
+        /* File Name Marquee */
+        .file-header {
             position: absolute;
             top: -40px;
-            left: 10px;
+            left: 0;
             width: 100%;
             z-index: 10;
         }
+
         .marquee-text {
             font-family: 'Delius', cursive;
             font-size: 16px;
-            color: rgba(255,255,255,0.8);
+            color: rgba(255, 255, 255, 0.7);
             white-space: nowrap;
-        }
-
-        /* Video Wrapper */
-        .player-card {
-            border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        }
+
+        /* --- INTEGRATED TEMPLATE CSS --- */
+        video-player {
+            display: block;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
             background: #000;
         }
 
-        /* --- VIDEO.JS CUSTOM THEME --- */
-        .video-js {
-            font-family: 'Inter', sans-serif;
-            background-color: #000;
-        }
-
-        /* Floating Pill Control Bar */
-        .video-js .vjs-control-bar {
-            display: flex;
-            width: 92% !important;
-            height: 64px !important;
-            bottom: 20px !important;
-            left: 4% !important;
-            right: 4% !important;
-            border-radius: var(--border-radius) !important;
-            background-color: var(--control-bg) !important;
-            backdrop-filter: var(--blur-effect);
-            -webkit-backdrop-filter: var(--blur-effect);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 0 15px;
-            align-items: center;
-        }
-
-        /* Custom Play Button in Center */
-        .vjs-big-play-button {
-            width: 80px !important;
-            height: 80px !important;
-            line-height: 80px !important;
-            border-radius: 50% !important;
-            background: rgba(255,255,255,0.15) !important;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2) !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            transition: all 0.3s ease !important;
-        }
-        .video-js:hover .vjs-big-play-button {
-            background: rgba(255,255,255,0.25) !important;
-            transform: translate(-50%, -50%) scale(1.1) !important;
-        }
-
-        /* Seek Bar (Progress) */
-        .vjs-progress-control {
-            position: absolute !important;
-            width: 100% !important;
-            height: 6px !important;
-            top: -12px !important;
-            left: 0 !important;
-        }
-        .vjs-progress-holder {
-            margin: 0 !important;
-            height: 100% !important;
-            border-radius: 10px !important;
-        }
-        .vjs-play-progress {
-            background: #fff !important; /* Pure white bar like images */
-            border-radius: 10px !important;
-        }
-        .vjs-play-progress:before {
-            font-size: 14px !important;
-            top: -4px !important;
-        }
-
-        /* Icons Styling */
-        .vjs-button > .vjs-icon-placeholder:before {
-            font-size: 24px !important;
-            line-height: 64px !important;
-        }
-
-        /* Time Display */
-        .vjs-current-time, .vjs-duration {
-            display: block !important;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        /* Custom Skip Icons */
-        .skip-icon {
-            cursor: pointer;
-            padding: 0 10px;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0.9;
-        }
-        .skip-icon:hover { opacity: 1; }
-
-        /* Loader */
-        #loader {
-            position: fixed;
+        /* Center Play/Pause Bubble Fix */
+        .media-input-feedback {
+            position: absolute;
             inset: 0;
-            background: #000;
-            z-index: 100;
             display: flex;
-            justify-content: center;
             align-items: center;
-            transition: opacity 0.5s;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 2;
         }
-        .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @media (max-width: 600px) {
-            .video-js .vjs-control-bar {
-                height: 55px !important;
+        /* Modern Floating Pill Adjustment */
+        .media-minimal-skin--video .media-controls {
+            background-color: rgba(20, 20, 20, 0.7) !important;
+            backdrop-filter: blur(12px) saturate(1.5);
+            -webkit-backdrop-filter: blur(12px) saturate(1.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            bottom: 20px !important;
+            inset-inline: 20px !important;
+            width: auto !important;
+            height: 60px !important;
+            border-radius: 30px !important;
+        }
+
+        /* Center Play button feedback icon */
+        .media-input-feedback-bubble .media-icon {
+            width: 64px;
+            height: 64px;
+            color: white;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            padding: 10px;
+        }
+
+        /* PASTE OF YOUR PROVIDED TEXT/PLAIN CSS (Optimized for this layout) */
+        /* (The following is the logic from your provided CSS block) */
+        
+        .media-minimal-skin {
+            --media-icon-size: 20px;
+            --media-current-shadow-color: rgba(0,0,0,0.5);
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .media-button {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .media-button:active { transform: scale(0.9); }
+
+        .media-slider__track {
+            background: rgba(255,255,255,0.2) !important;
+        }
+        .media-slider__fill {
+            background: #fff !important;
+        }
+        .media-slider__thumb {
+            background: #fff !important;
+            width: 12px !important;
+            height: 12px !important;
+        }
+
+        /* Settings Menu Styling */
+        .media-menu {
+            background: rgba(25, 25, 25, 0.95) !important;
+            backdrop-filter: blur(15px);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Hide default loading to show your clean look */
+        .media-buffering-indicator[data-visible] {
+            display: grid;
+            place-content: center;
+        }
+
+        @media (max-width: 768px) {
+            .media-minimal-skin--video .media-controls {
                 bottom: 10px !important;
+                inset-inline: 10px !important;
+                height: 50px !important;
             }
-            .vjs-current-time, .vjs-duration, .vjs-volume-panel { display: none !important; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loader"><div class="spinner"></div></div>
-
     <div class="container">
-        <div class="header-info">
+        <div class="file-header">
             <div class="marquee-text">{{ file_name }}</div>
         </div>
 
-        <div class="player-card">
-            <video 
-                id="my-video" 
-                class="video-js vjs-big-play-centered" 
-                playsinline 
-                preload="auto">
-            </video>
-        </div>
+        <!-- NEW VIDSTACK PLAYER TEMPLATE -->
+        <video-player>
+            <media-container class="media-minimal-skin media-minimal-skin--video">
+                <!-- Source is now dynamically injected via Jinja -->
+                <video src="{{ file_url }}" playsinline preload="auto" crossorigin="anonymous"></video>
+
+                <!-- Loading State -->
+                <media-buffering-indicator class="media-buffering-indicator">
+                    <media-icon name="spinner" family="minimal" class="media-icon"></media-icon>
+                </media-buffering-indicator>
+
+                <!-- Floating Controls Pill -->
+                <media-controls class="media-controls">
+                    <media-tooltip-group>
+                        <!-- Play / Rewind / Fast Forward -->
+                        <div class="media-button-group">
+                            <media-play-button class="media-button media-button--subtle media-button--icon media-button--play">
+                                <media-icon name="restart" family="minimal" class="media-icon media-icon--restart"></media-icon>
+                                <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
+                                <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
+                            </media-play-button>
+
+                            <media-seek-button seconds="-10" class="media-button media-button--subtle media-button--icon media-button--seek">
+                                <span class="media-icon__container">
+                                    <media-icon name="seek" family="minimal" class="media-icon media-icon--flipped"></media-icon>
+                                    <span class="media-icon__label">10</span>
+                                </span>
+                            </media-seek-button>
+
+                            <media-seek-button seconds="10" class="media-button media-button--subtle media-button--icon media-button--seek">
+                                <span class="media-icon__container">
+                                    <media-icon name="seek" family="minimal" class="media-icon"></media-icon>
+                                    <span class="media-icon__label">10</span>
+                                </span>
+                            </media-seek-button>
+                        </div>
+
+                        <!-- Progress Bar & Time -->
+                        <div class="media-time-controls">
+                            <media-time-group class="media-time-group">
+                                <media-time type="current" class="media-time media-time--current"></media-time>
+                                <media-time-separator class="media-time-separator"></media-time-separator>
+                                <media-time type="duration" class="media-time media-time--duration"></media-time>
+                            </media-time-group>
+
+                            <media-time-slider class="media-slider">
+                                <media-slider-track class="media-slider__track">
+                                    <media-slider-fill class="media-slider__fill"></media-slider-fill>
+                                    <media-slider-buffer class="media-slider__buffer"></media-slider-buffer>
+                                </media-slider-track>
+                                <media-slider-thumb class="media-slider__thumb"></media-slider-thumb>
+                            </media-time-slider>
+                        </div>
+
+                        <!-- Right Actions -->
+                        <div class="media-button-group">
+                            <media-mute-button class="media-button media-button--subtle media-button--icon media-button--mute">
+                                <media-icon name="volume-off" family="minimal" class="media-icon media-icon--volume-off"></media-icon>
+                                <media-icon name="volume-low" family="minimal" class="media-icon media-icon--volume-low"></media-icon>
+                                <media-icon name="volume-high" family="minimal" class="media-icon media-icon--volume-high"></media-icon>
+                            </media-mute-button>
+
+                            <!-- Settings Menu -->
+                            <button commandfor="settings-menu" class="media-button media-button--subtle media-button--icon">
+                                <media-icon name="gear" family="minimal"></media-icon>
+                            </button>
+                            
+                            <media-menu id="settings-menu" side="top" align="end" class="media-menu">
+                                <media-menu-view>
+                                    <!-- Playback Speed -->
+                                    <media-menu-item commandfor="speed-menu" class="media-menu__item">
+                                        <span>Speed</span>
+                                        <media-menu-item-value></media-menu-item-value>
+                                    </media-menu-item>
+                                </media-menu-view>
+                                
+                                <media-menu id="speed-menu">
+                                    <media-playback-rate-radio-group>
+                                        <template>
+                                            <media-menu-radio-item class="media-menu__item">
+                                                <span data-part="label"></span>
+                                            </media-menu-radio-item>
+                                        </template>
+                                    </media-playback-rate-radio-group>
+                                </media-menu>
+                            </media-menu>
+
+                            <media-fullscreen-button class="media-button media-button--subtle media-button--icon">
+                                <media-icon name="fullscreen-enter" family="minimal" class="media-icon--fullscreen-enter"></media-icon>
+                                <media-icon name="fullscreen-exit" family="minimal" class="media-icon--fullscreen-exit"></media-icon>
+                            </media-fullscreen-button>
+                        </div>
+                    </media-tooltip-group>
+                </media-controls>
+
+                <!-- FEEDBACK ICONS (Play/Pause/Seek Center Icons) -->
+                <div class="media-input-feedback">
+                    <media-status-indicator actions="togglePaused" class="media-input-feedback-bubble">
+                        <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
+                        <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
+                    </media-status-indicator>
+
+                    <media-seek-indicator class="media-input-feedback-bubble">
+                        <media-icon name="chevron" family="minimal" class="media-icon media-icon--seek"></media-icon>
+                    </media-seek-indicator>
+                </div>
+
+                <!-- Hotkeys & Gestures -->
+                <media-hotkey keys="Space" action="togglePaused"></media-hotkey>
+                <media-gesture type="tap" action="togglePaused" region="center"></media-gesture>
+                <media-gesture type="doubletap" action="seekStep" value="-10" region="left"></media-gesture>
+                <media-gesture type="doubletap" action="seekStep" value="10" region="right"></media-gesture>
+
+            </media-container>
+        </video-player>
     </div>
 
-    <!-- Video.js Library -->
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-
     <script>
-        const videoSrc = "{{ file_url }}";
-        const isHLS = videoSrc.includes('.m3u8');
-
-        // Initialize Player
-        const player = videojs('my-video', {
-            controls: true,
-            fluid: true,
-            playbackRates: [0.5, 1, 1.5, 2],
-            controlBar: {
-                children: [
-                    'playToggle',
-                    'currentTimeDisplay',
-                    'progressControl',
-                    'durationDisplay',
-                    'volumePanel',
-                    'playbackRateMenuButton',
-                    'fullscreenToggle',
-                ]
-            }
-        });
-
-        // Set Source
-        player.src({
-            src: videoSrc,
-            type: isHLS ? 'application/x-mpegURL' : 'video/mp4'
-        });
-
-        // Add Custom Skip Buttons (Rewind & Forward 10s)
-        const createSkipButton = (direction) => {
-            const btn = document.createElement('div');
-            btn.className = `vjs-control skip-icon`;
-            btn.innerHTML = direction === 'back' ? 
-                `<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12.5 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.31 2.69-6 6-6s6 2.69 6 6-2.69 6-6 6c-1.66 0-3.17-.67-4.24-1.76l-1.42 1.42C8.13 19.42 9.96 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-2.42 12V9.38h-.12l-1.21.87V11.4l1.21-.85h.12V15h1zm4.92-3c0-1.66-.36-3-1.42-3-1.06 0-1.42 1.34-1.42 3s.36 3 1.42 3c1.06 0 1.42-1.34 1.42-3zm-1.42 2.11c-.48 0-.58-.83-.58-2.11s.1-2.11.58-2.11.58.83.58 2.11-.1 2.11-.58 2.11z"/></svg>` :
-                `<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M11.5 3c4.97 0 9 4.03 9 9H23l-3.89 3.89-.07.14L15 12h3c0-3.31-2.69-6-6-6s-6 2.69-6 6 2.69 6 6 6c1.66 0 3.17-.67 4.24-1.76l1.42 1.42C15.87 19.42 14.04 20 12 20c-4.97 0-9-4.03-9-9s4.03-9 9-9zm-2.42 12V9.38h-.12l-1.21.87V11.4l1.21-.85h.12V15h1zm4.92-3c0-1.66-.36-3-1.42-3-1.06 0-1.42 1.34-1.42 3s.36 3 1.42 3c1.06 0 1.42-1.34 1.42-3zm-1.42 2.11c-.48 0-.58-.83-.58-2.11s.1-2.11.58-2.11.58.83.58 2.11-.1 2.11-.58 2.11z"/></svg>`;
-            
-            btn.onclick = () => {
-                const time = player.currentTime();
-                player.currentTime(direction === 'back' ? time - 10 : time + 10);
-            };
-            return btn;
-        };
-
-        player.ready(() => {
-            const controlBar = player.controlBar.el();
-            const playToggle = player.controlBar.playToggle.el();
-            // Insert Skip Back after Play button, Skip Forward after that
-            controlBar.insertBefore(createSkipButton('back'), playToggle.nextSibling);
-            controlBar.insertBefore(createSkipButton('forward'), playToggle.nextSibling.nextSibling);
-            
-            document.getElementById('loader').style.opacity = '0';
-            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
-        });
-
-        // Double Tap Skip Logic
-        let lastTap = 0;
-        player.on('touchend', (e) => {
-            const now = Date.now();
-            if (now - lastTap < 300) {
-                const rect = player.el().getBoundingClientRect();
-                const x = e.changedTouches[0].clientX - rect.left;
-                if (x < rect.width / 2) player.currentTime(player.currentTime() - 10);
-                else player.currentTime(player.currentTime() + 10);
-            }
-            lastTap = now;
-        });
-
-        // Disable Right Click
+        // Disable Context Menu
         document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>
