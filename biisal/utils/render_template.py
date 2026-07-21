@@ -57,6 +57,7 @@ async def render_page(id, secure_hash, src=None, player=None):
         file_size=file_size,
         file_unique_id=file_data.unique_id,
         tag=tag,
+        mime_type=mime_type,
         player=player or "plyr",
         poster_url=poster_url,
     )
