@@ -47,38 +47,7 @@
     border-radius: 0;
     overflow: hidden;
         }
-        .center-play-button {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 15;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    color: white;
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-}
-
-/* Show the button when controls are visible */
-.media-controls[data-visible] ~ .center-play-button {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* Make the icons inside larger */
-.center-play-button .media-icon {
-    width: 40px;
-    height: 40px;
-}
+        
 
         .file-name-marquee {
             font-family: 'Delius', cursive;
@@ -2086,6 +2055,39 @@ media-container {
   + .media-slider__preview
   .media-slider__value {
   display: none;
+}
+
+.center-play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    color: white;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+/* Show the button when controls are visible */
+.media-controls[data-visible] ~ .center-play-button {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Make the icons inside larger */
+.center-play-button .media-icon {
+    width: 40px;
+    height: 40px;
 }
     </style>
 </head>
