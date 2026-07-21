@@ -5,26 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
     
     <style>
-        /* ====================================================================
-           Custom full-viewport & overlay styles
-           ==================================================================== */
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            overflow: hidden;
+        /* ----- Custom Page Styles (minimal) ----- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;               /* Pure black, like native player */
             font-family: 'Raleway', sans-serif;
             color: white;
+            min-height: 100vh;
+            overflow: hidden;               /* No scrollbars, video fills viewport */
             -webkit-user-select: none;
             user-select: none;
         }
 
-        /* Loading spinner (fixed overlay) */
+        /* Player wrapper – full width, no rounded corners, no extra shadow */
+        .player-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100vh;                  /* Fill the entire viewport */
+            background: #000;
+            overflow: hidden;
+        }
+
+        /* Title overlay – transparent background, subtle text shadow */
+        .file-info {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 5;
+            padding: 16px 24px;
+            background: transparent;        /* No background */
+            font-family: 'Delius', cursive;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;           /* Allows clicks to pass through to the player */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Loading overlay (unchanged) */
         .loading {
             position: fixed;
             inset: 0;
@@ -36,6 +63,7 @@
             transition: opacity 0.5s;
         }
         .loading.hidden { opacity: 0; pointer-events: none; }
+        
         .spinner {
             width: 50px; height: 50px;
             border: 3px solid rgba(255,255,255,0.1);
@@ -45,104 +73,18 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Full‑screen player wrapper */
-        .player-wrapper {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
+        @media (max-width: 768px) {
+            .file-info {
+                font-size: 16px;
+                padding: 12px 16px;
+            }
         }
 
-        /* Make the video‑player element fill the wrapper */
-        video-player {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Remove rounded corners for a native feel */
-        video-player {
-            --media-border-radius: 0;
-        }
-
-        /* Title overlay – transparent, no background */
-        .title-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 20px;
-            font-family: 'Delius', cursive;
-            font-size: 16px;
-            color: white;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            z-index: 15;
-            pointer-events: none;
-            background: transparent;
-        }
-
-        /* Central play/pause button – mimics native browser look */
-        .center-play-btn {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: rgba(79, 70, 229, 0.75);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 20;
-            transition: opacity 0.25s, transform 0.15s, background-color 0.2s;
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .center-play-btn.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        .center-play-btn:hover {
-            background: rgba(79, 70, 229, 1);
-            transform: translate(-50%, -50%) scale(1.05);
-        }
-        .center-play-btn:active {
-            transform: translate(-50%, -50%) scale(0.95);
-        }
-        .center-play-btn svg {
-            width: 32px;
-            height: 32px;
-            fill: white;
-            margin-left: 4px;   /* optical centring of the triangle */
-        }
-
-        /* Hide the play button when video is playing or buffering */
-        .center-play-btn.playing {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* ====================================================================
-           Full Video.js Minimal UI skin CSS (from the prompt)
-           This is exactly the same as the provided player.css, inlined for
-           a self‑contained page. It defines all the custom elements’ styles.
-           ==================================================================== */
-        /* ---------- COPY THE ENTIRE player.css HERE ---------- */
-        /* (The complete CSS from the user’s prompt, starting with
-           the comment “/* ---------------------------------------------------
-           Global styles for the host document…” and ending before the
-           next section. For brevity this is omitted in the answer text,
-           but it MUST be pasted in the actual file.) */
+        /* =================================================================
+           PLACE THE ENTIRE player.css CONTENT BELOW
+           (the long CSS you provided, starting from
+           "/* -------------------------------------------------------------------------- */")
+           ================================================================= */
         /* -------------------------------------------------------------------------- */
 /* Global styles for the host document, outside of the Shadow DOM             */
 /* -------------------------------------------------------------------------- */
@@ -2063,31 +2005,25 @@ media-container {
 </head>
 <body>
 
-    <!-- Loading spinner (hidden when video is ready) -->
+    <!-- Loading spinner -->
     <div class="loading" id="loader"><div class="spinner"></div></div>
 
-    <!-- Full‑screen player area -->
     <div class="player-wrapper">
+        <!-- Title overlay (no background, no marquee, just static) -->
+        <div class="file-info">{{ file_name }}</div>
 
-        <!-- Transparent title overlay -->
-        <div class="title-overlay" id="titleOverlay">{{ file_name }}</div>
-
-        <!-- Central play/pause button (visible when paused/ended) -->
-        <button class="center-play-btn" id="centerPlayBtn" aria-label="Play">
-            <svg viewBox="0 0 24 24">
-                <polygon points="5,3 19,12 5,21"/>
-            </svg>
-        </button>
-
-        <!-- Video.js minimal custom element -->
+        <!-- Modern video-player custom element (minimal UI) -->
         <video-player>
             <media-container class="media-minimal-skin media-minimal-skin--video">
+                <!-- Video element (source will be set by JS) -->
                 <video playsinline preload="auto"></video>
 
+                <!-- Buffering indicator -->
                 <media-buffering-indicator class="media-buffering-indicator">
                     <media-icon name="spinner" family="minimal" class="media-icon"></media-icon>
                 </media-buffering-indicator>
 
+                <!-- Error dialog -->
                 <media-error-dialog class="media-error">
                     <div class="media-error__dialog">
                         <div class="media-error__content">
@@ -2100,6 +2036,7 @@ media-container {
                     </div>
                 </media-error-dialog>
 
+                <!-- Controls (full minimal UI template) -->
                 <media-controls class="media-controls">
                     <media-tooltip-group>
                         <div class="media-button-group">
@@ -2358,11 +2295,11 @@ media-container {
                 <media-hotkey keys=">" action="speedUp"></media-hotkey>
                 <media-hotkey keys="<" action="speedDown"></media-hotkey>
 
-                <!-- Gestures (single tap toggles play/pause; double‑tap left/right seeks) -->
+                <!-- Gestures -->
                 <media-gesture type="tap" action="togglePaused" pointer="mouse" region="center"></media-gesture>
                 <media-gesture type="tap" action="toggleControls" pointer="touch"></media-gesture>
                 <media-gesture type="doubletap" action="seekStep" value="-10" region="left"></media-gesture>
-                <!-- Removed center double‑tap fullscreen to avoid conflict with central play button -->
+                <media-gesture type="doubletap" action="toggleFullscreen" region="center"></media-gesture>
                 <media-gesture type="doubletap" action="seekStep" value="10" region="right"></media-gesture>
 
                 <!-- Input Feedback -->
@@ -2404,13 +2341,13 @@ media-container {
         </video-player>
     </div>
 
-    <!-- HLS support (optional) -->
+    <!-- HLS support (for .m3u8 streams) -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <!-- Video.js Minimal UI module -->
+    <!-- Video.js Minimal UI Module -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video-minimal-ui.js"></script>
     
     <script>
-        // Prevent default context menu and Ctrl+S
+        // Disable context menu and Ctrl+S
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -2420,61 +2357,26 @@ media-container {
 
         const videoUrl = "{{ file_url }}";
         const loader = document.getElementById('loader');
-        const centerBtn = document.getElementById('centerPlayBtn');
 
         function hideLoader() {
             loader.classList.add('hidden');
         }
 
-        // Show/hide central button based on video state
-        function updateCenterButton(video) {
-            if (!video) return;
-            // Show button when paused, ended, or not yet started; hide when playing or buffering with playback intent
-            if (video.paused || video.ended) {
-                centerBtn.classList.remove('hidden', 'playing');
-            } else {
-                centerBtn.classList.add('hidden', 'playing');
-            }
-        }
-
-        // Wait for the custom element to be defined, then set source and wire events
+        // Wait for the custom element to be registered, then attach the source
         customElements.whenDefined('video-player').then(() => {
             const video = document.querySelector('video-player video') || document.querySelector('video');
             if (!video) return;
 
-            // Wire central play button
-            centerBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (video.paused || video.ended) {
-                    video.play().catch(() => {});
-                } else {
-                    video.pause();
-                }
-            });
-
-            // Bind video events for button visibility
-            video.addEventListener('play', () => updateCenterButton(video));
-            video.addEventListener('pause', () => updateCenterButton(video));
-            video.addEventListener('ended', () => updateCenterButton(video));
-            video.addEventListener('loadeddata', () => {
-                updateCenterButton(video);
+            function onReady() {
                 hideLoader();
-            });
+            }
 
-            // Error handling fallback – hide loader after timeout
-            setTimeout(() => {
-                if (!loader.classList.contains('hidden')) hideLoader();
-            }, 8000);
-
-            // Set source: HLS (.m3u8) or native MP4
             if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                // HLS stream
                 const hls = new Hls();
                 hls.loadSource(videoUrl);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    hideLoader();
-                    updateCenterButton(video);
-                });
+                hls.on(Hls.Events.MANIFEST_PARSED, onReady);
                 hls.on(Hls.Events.ERROR, (event, data) => {
                     if (data.fatal) {
                         switch (data.type) {
@@ -2487,19 +2389,28 @@ media-container {
                                 hls.recoverMediaError();
                                 break;
                             default:
-                                console.error('Fatal HLS error');
+                                console.error('Fatal HLS error, cannot recover');
                                 break;
                         }
                     }
                 });
             } else {
+                // MP4 or native supported format
                 video.src = videoUrl;
                 if (video.readyState >= 2) {
-                    hideLoader();
-                    updateCenterButton(video);
+                    onReady();
+                } else {
+                    video.addEventListener('loadeddata', onReady);
                 }
             }
         });
+
+        // Fallback: hide loader after 8 seconds even if the player hasn't reported ready
+        setTimeout(() => {
+            if (!loader.classList.contains('hidden')) {
+                hideLoader();
+            }
+        }, 8000);
     </script>
 </body>
 </html>
