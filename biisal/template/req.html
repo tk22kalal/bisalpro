@@ -2057,6 +2057,7 @@ media-container {
   display: none;
 }
 
+/* ---------- Central Play/Pause Button (YouTube style) ---------- */
 .center-play-button {
     position: absolute;
     top: 50%;
@@ -2066,11 +2067,11 @@ media-container {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 80px;
-    height: 80px;
+    width: 64px;                     /* Smaller circle */
+    height: 64px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.45); /* Lighter semi-transparent black */
+    backdrop-filter: blur(6px);
     color: white;
     cursor: pointer;
     opacity: 0;
@@ -2078,16 +2079,36 @@ media-container {
     transition: opacity 0.2s ease;
 }
 
-/* Show the button when controls are visible */
+/* Show button when controls are visible */
 .media-controls[data-visible] ~ .center-play-button {
     opacity: 1;
     pointer-events: auto;
 }
 
-/* Make the icons inside larger */
+/* Hide ALL icons by default (same pattern as player.css) */
+.center-play-button .media-icon--restart,
+.center-play-button .media-icon--play,
+.center-play-button .media-icon--pause {
+    display: none;
+    opacity: 0;
+}
+
+/* ----- Active icon per state (replicated from .media-button--play rules) ----- */
+/* Ended → restart icon */
+.center-play-button[data-ended] .media-icon--restart,
+/* Paused or not yet started → play icon */
+.center-play-button:not([data-ended])[data-paused] .media-icon--play,
+.center-play-button:not([data-ended]):not([data-started]) .media-icon--play,
+/* Playing → pause icon */
+.center-play-button[data-started]:not([data-paused]):not([data-ended]) .media-icon--pause {
+    display: block;
+    opacity: 1;
+}
+
+/* Make the active icon a comfortable size */
 .center-play-button .media-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
 }
     </style>
 </head>
