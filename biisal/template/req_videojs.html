@@ -4,18 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ file_name }}</title>
-  <!-- HLS.js Library for .m3u8 support and aggressive buffering -->
+  
+  <!-- HLS.js for .m3u8 support and aggressive preloading -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway|Delius">
   
   <style>
     :root {
-      --progress-played: #ff5722;   /* Orange Played */
-      --progress-dot: #ff0000;      /* Red Dot */
-      --progress-buffered: rgba(255, 255, 255, 0.4); /* White Buffered */
-      --progress-bg: rgba(255, 255, 255, 0.2);       /* Darker Background */
+      --progress-played: #ff5722;
+      --progress-dot: #ff0000;
+      --progress-buffered: rgba(255, 255, 255, 0.4);
+      --progress-bg: rgba(255, 255, 255, 0.2);
       --speed-bg: rgba(28, 28, 28, 0.98);
-      --font: 'Raleway', system-ui, -apple-system, sans-serif;
+      --font: 'Raleway', sans-serif;
     }
 
     * {
@@ -25,6 +26,11 @@
       user-select: none;
       -webkit-user-select: none;
     }
+
+    /* 🛑 FORCE HIDE NATIVE BROWSER CONTROLS */
+    video::-webkit-media-controls { display: none !important; }
+    video::-webkit-media-controls-enclosure { display: none !important; }
+    video::-webkit-media-controls-panel { display: none !important; }
 
     body {
       background-color: #000;
@@ -37,11 +43,10 @@
       overflow: hidden;
     }
 
-    /* TOP TITLE MARQUEE */
     header { width: 100%; position: fixed; top: 0; z-index: 50; }
     marquee { 
       font-size: 18px; font-weight: 600; color: #fff; 
-      background: rgba(0,0,0,0.8); padding: 10px; 
+      background: rgba(0,0,0,0.85); padding: 10px; 
       font-family: 'Delius', serif; 
     }
 
@@ -54,16 +59,18 @@
       overflow: hidden;
     }
 
-    video { width: 100%; height: 100%; display: block; cursor: pointer; object-fit: contain; }
+    video { 
+      width: 100%; height: 100%; display: block; 
+      object-fit: contain;
+      cursor: none; /* Hide cursor on video area */
+    }
 
-    /* SHADOW OVERLAYS */
     .top-shadow {
       position: absolute; top: 0; left: 0; right: 0; height: 100px;
       background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
       z-index: 10; pointer-events: none; transition: opacity 0.3s;
     }
 
-    /* BUFFERING SPINNER */
     .buffer-overlay {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       z-index: 15; display: none; pointer-events: none;
@@ -75,13 +82,11 @@
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* SETTINGS GEAR */
     .settings-btn {
       position: absolute; top: 20px; right: 20px; z-index: 25;
       background: none; border: none; cursor: pointer; transition: opacity 0.3s;
     }
 
-    /* SPEED MENU */
     .settings-menu {
       position: absolute; top: 60px; right: 20px;
       background: var(--speed-bg); border-radius: 15px;
@@ -92,7 +97,7 @@
     .menu-item { padding: 12px 16px; color: #fff; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; }
     .menu-item:hover { background: rgba(255,255,255,0.1); }
 
-    .speed-view { display: none; padding: 8px 15px; }
+    .speed-view { display: none; padding: 8px 15px; flex-direction: column; }
     .speed-display-large { color: #fff; font-size: 22px; font-weight: 500; text-align: center; margin-bottom: 15px; margin-top: -10px; }
     .slider-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
     .adj-btn { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -104,7 +109,6 @@
     .pill { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 50px; height: 36px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .normal-label { font-size: 10px; color: rgba(255,255,255,0.6); }
 
-    /* CENTER PLAY BUTTON */
     .center-play {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       width: 80px; height: 80px; background: rgba(255, 255, 255, 0.95);
@@ -112,7 +116,6 @@
       z-index: 20; cursor: pointer; transition: opacity 0.3s;
     }
 
-    /* AUTO-HIDE STATE */
     .video-container.inactive .controls-overlay,
     .video-container.inactive .settings-btn,
     .video-container.inactive .center-play,
@@ -120,13 +123,11 @@
       opacity: 0; pointer-events: none;
     }
 
-    /* SEEK ANIMATIONS */
     .seek-feedback { position: absolute; top: 0; bottom: 0; width: 50%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 4; opacity: 0; }
     .seek-left { left: 0; } .seek-right { right: 0; }
     @keyframes seekAnim { 0% { opacity: 0; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
     .animate-seek { animation: seekAnim 0.6s ease-out forwards; }
 
-    /* BOTTOM CONTROLS */
     .controls-overlay {
       position: absolute; bottom: 0; left: 0; right: 0;
       background: linear-gradient(transparent, rgba(0,0,0,0.9));
@@ -139,7 +140,6 @@
     .ctrl-btn { background: none; border: none; cursor: pointer; }
     .ctrl-btn svg { width: 24px; height: 24px; fill: #fff; }
 
-    /* SEEKBAR */
     .prog-bar {
       -webkit-appearance: none; width: 100%; height: 4px;
       border-radius: 2px; background: var(--progress-bg);
@@ -153,14 +153,11 @@
   <header><marquee>{{ file_name }}</marquee></header>
 
   <div class="video-container" id="playerContainer">
-    <!-- Video element (Source handled by JS for HLS support) -->
-    <video id="mainVideo" playsinline preload="auto" crossorigin="anonymous" controlsList="nodownload"></video>
+    <!-- 🛑 IMPORTANT: NO "controls" attribute here -->
+    <video id="mainVideo" playsinline webkit-playsinline preload="auto" crossorigin="anonymous"></video>
 
     <div class="top-shadow"></div>
-    
-    <div class="buffer-overlay" id="bufferSpinner">
-      <div class="spinner"></div>
-    </div>
+    <div class="buffer-overlay" id="bufferSpinner"><div class="spinner"></div></div>
 
     <!-- Settings Gear -->
     <button class="settings-btn" id="setBtn">
@@ -180,13 +177,13 @@
       </div>
     </div>
 
-    <!-- Center Button -->
+    <!-- Center Play -->
     <div class="center-play" id="centerBtn">
        <svg id="playIcon" viewBox="0 0 24 24" width="36"><path d="M8 5v14l11-7z" fill="black"/></svg>
     </div>
 
-    <div class="seek-feedback seek-left" id="seekLeft"><svg viewBox="0 0 24 24" fill="rgba(0,0,0,0.6)" width="60"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></div>
-    <div class="seek-feedback seek-right" id="seekRight"><svg viewBox="0 0 24 24" fill="rgba(0,0,0,0.6)" width="60"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></div>
+    <div class="seek-feedback seek-left" id="seekLeft"><svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.6)" width="60"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></div>
+    <div class="seek-feedback seek-right" id="seekRight"><svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.6)" width="60"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></div>
 
     <div class="controls-overlay">
       <div class="controls-row">
@@ -201,105 +198,111 @@
   </div>
 
   <script>
-    const video = document.getElementById('mainVideo');
-    const playerContainer = document.getElementById('playerContainer');
-    const hlsUrl = "{{ file_url }}"; // DYNAMIC SOURCE
+    (function() {
+      'use strict';
+      const video = document.getElementById('mainVideo');
+      const playerContainer = document.getElementById('playerContainer');
+      const hlsUrl = "{{ file_url }}"; // THIS MUST BE A VALID URL
 
-    // 1. HLS SETUP WITH AGGRESSIVE PRELOAD
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        maxBufferLength: 30,       // Seconds to buffer ahead
-        maxMaxBufferLength: 60,    // Max seconds to cache
-        enableWorker: true,
-        aggressiveLevelSwitch: true
-      });
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native Safari support
-      video.src = hlsUrl;
-    }
-
-    // 2. DISABLE CONTEXT MENU & LONG PRESS
-    playerContainer.oncontextmenu = (e) => e.preventDefault();
-    let pressTimer;
-    playerContainer.ontouchstart = (e) => { pressTimer = setTimeout(() => e.preventDefault(), 500); };
-    playerContainer.ontouchend = () => clearTimeout(pressTimer);
-
-    // 3. UI LOGIC
-    let hideTimer;
-    const showUI = () => { playerContainer.classList.remove('inactive'); resetHideTimer(); };
-    const hideUI = () => { playerContainer.classList.add('inactive'); setMenu.classList.remove('active'); };
-    const resetHideTimer = () => { clearTimeout(hideTimer); if (!video.paused) hideTimer = setTimeout(hideUI, 3500); };
-
-    video.onclick = (e) => {
-      if (e.detail === 2) { // Double Tap Seek
-        const x = e.clientX - video.getBoundingClientRect().left;
-        const target = x < video.clientWidth / 2 ? 'seekLeft' : 'seekRight';
-        video.currentTime += (target === 'seekLeft' ? -10 : 10);
-        const el = document.getElementById(target);
-        el.classList.remove('animate-seek'); void el.offsetWidth; el.classList.add('animate-seek');
-        return;
+      // 1. HLS SETUP
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          maxBufferLength: 60,
+          maxMaxBufferLength: 120,
+          enableWorker: true,
+          lowLatencyMode: true
+        });
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = hlsUrl;
       }
-      playerContainer.classList.contains('inactive') ? showUI() : hideUI();
-    };
 
-    document.getElementById('centerBtn').onclick = (e) => {
-      e.stopPropagation();
-      video.paused ? video.play() : video.pause();
-    };
+      // 2. LONG PRESS & SECURITY
+      let pressTimer;
+      playerContainer.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => { e.preventDefault(); }, 500);
+      }, { passive: false });
+      playerContainer.addEventListener('touchend', () => clearTimeout(pressTimer));
 
-    video.onplay = () => { document.getElementById('playIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="black"/>'; resetHideTimer(); };
-    video.onpause = () => { document.getElementById('playIcon').innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>'; showUI(); };
+      // 3. UI TOGGLE & AUTO-HIDE
+      let hideTimer;
+      const showUI = () => { playerContainer.classList.remove('inactive'); resetHideTimer(); };
+      const hideUI = () => { playerContainer.classList.add('inactive'); setMenu.classList.remove('active'); };
+      const resetHideTimer = () => { clearTimeout(hideTimer); if (!video.paused) hideTimer = setTimeout(hideUI, 3500); };
 
-    // 4. BUFFERING & PROGRESS
-    const spinner = document.getElementById('bufferSpinner');
-    const progBar = document.getElementById('progBar');
-    video.addEventListener('waiting', () => spinner.style.display = 'block');
-    video.addEventListener('playing', () => spinner.style.display = 'none');
-    
-    function updateProgress() {
-      const played = (video.currentTime / video.duration) * 100 || 0;
-      let bufferedEnd = 0;
-      if (video.buffered.length > 0) {
-        for (let i = 0; i < video.buffered.length; i++) {
-          if (video.buffered.start(i) <= video.currentTime) bufferedEnd = video.buffered.end(i);
+      video.addEventListener('click', (e) => {
+        if (e.detail === 2) {
+          const x = e.clientX - video.getBoundingClientRect().left;
+          const target = x < video.clientWidth / 2 ? 'seekLeft' : 'seekRight';
+          video.currentTime += (target === 'seekLeft' ? -10 : 10);
+          const el = document.getElementById(target);
+          el.classList.remove('animate-seek'); void el.offsetWidth; el.classList.add('animate-seek');
+          return;
         }
+        playerContainer.classList.contains('inactive') ? showUI() : hideUI();
+      });
+
+      document.getElementById('centerBtn').onclick = (e) => {
+        e.stopPropagation();
+        video.paused ? video.play() : video.pause();
+      };
+
+      video.onplay = () => { document.getElementById('playIcon').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="black"/>'; resetHideTimer(); };
+      video.onpause = () => { document.getElementById('playIcon').innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>'; showUI(); };
+
+      // 4. BUFFERING & PROGRESS
+      const spinner = document.getElementById('bufferSpinner');
+      const progBar = document.getElementById('progBar');
+      video.addEventListener('waiting', () => spinner.style.display = 'block');
+      video.addEventListener('playing', () => spinner.style.display = 'none');
+      
+      function updateProgress() {
+        const played = (video.currentTime / video.duration) * 100 || 0;
+        let bufferedEnd = 0;
+        if (video.buffered.length > 0) {
+          for (let i = 0; i < video.buffered.length; i++) {
+            if (video.buffered.start(i) <= video.currentTime) bufferedEnd = video.buffered.end(i);
+          }
+        }
+        const buffered = (bufferedEnd / video.duration) * 100 || 0;
+        progBar.style.background = `linear-gradient(to right, var(--progress-played) 0%, var(--progress-played) ${played}%, var(--progress-buffered) ${played}%, var(--progress-buffered) ${buffered}%, var(--progress-bg) ${buffered}%, var(--progress-bg) 100%)`;
+        document.getElementById('currTime').textContent = fmt(video.currentTime);
       }
-      const buffered = (bufferedEnd / video.duration) * 100 || 0;
-      progBar.style.background = `linear-gradient(to right, var(--progress-played) 0%, var(--progress-played) ${played}%, var(--progress-buffered) ${played}%, var(--progress-buffered) ${buffered}%, var(--progress-bg) ${buffered}%, var(--progress-bg) 100%)`;
-      document.getElementById('currTime').textContent = fmt(video.currentTime);
-    }
 
-    const fmt = (s) => isNaN(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;
-    video.ontimeupdate = updateProgress;
-    video.onprogress = updateProgress;
-    video.onloadedmetadata = () => document.getElementById('duration').textContent = fmt(video.duration);
-    progBar.oninput = (e) => { video.currentTime = (e.target.value / 100) * video.duration; resetHideTimer(); };
+      const fmt = (s) => isNaN(s) ? "0:00" : `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;
+      video.ontimeupdate = updateProgress;
+      video.addEventListener('progress', updateProgress);
+      video.onloadedmetadata = () => {
+        document.getElementById('duration').textContent = fmt(video.duration);
+        updateProgress();
+      };
+      progBar.oninput = (e) => { video.currentTime = (e.target.value / 100) * video.duration; resetHideTimer(); };
 
-    // 5. SETTINGS & SPEED
-    const setBtn = document.getElementById('setBtn');
-    const setMenu = document.getElementById('setMenu');
-    setBtn.onclick = (e) => { e.stopPropagation(); setMenu.classList.toggle('active'); resetHideTimer(); };
-    document.getElementById('openSpeed').onclick = (e) => { e.stopPropagation(); document.getElementById('mainMenuView').style.display='none'; document.getElementById('speedView').style.display='flex'; };
-    document.getElementById('backToMenu').onclick = (e) => { e.stopPropagation(); document.getElementById('mainMenuView').style.display='block'; document.getElementById('speedView').style.display='none'; };
-    document.onclick = () => setMenu.classList.remove('active');
+      // 5. SETTINGS
+      const setBtn = document.getElementById('setBtn');
+      const setMenu = document.getElementById('setMenu');
+      setBtn.onclick = (e) => { e.stopPropagation(); setMenu.classList.toggle('active'); resetHideTimer(); };
+      document.getElementById('openSpeed').onclick = (e) => { e.stopPropagation(); document.getElementById('mainMenuView').style.display='none'; document.getElementById('speedView').style.display='flex'; };
+      document.getElementById('backToMenu').onclick = (e) => { e.stopPropagation(); document.getElementById('mainMenuView').style.display='block'; document.getElementById('speedView').style.display='none'; };
+      document.onclick = () => setMenu.classList.remove('active');
 
-    function updateSpeed(val) {
-      val = Math.max(0.5, Math.min(3, parseFloat(val)));
-      video.playbackRate = val;
-      document.getElementById('speedRange').value = val;
-      const t = val.toFixed(2).replace(/[.,]00$/, "") + 'x';
-      document.getElementById('largeSpeedLabel').textContent = t;
-      document.getElementById('currentSpeedLabel').textContent = t;
-    }
-    document.getElementById('speedRange').oninput = (e) => updateSpeed(e.target.value);
-    document.getElementById('minusBtn').onclick = (e) => { e.stopPropagation(); updateSpeed(video.playbackRate - 0.05); };
-    document.getElementById('plusBtn').onclick = (e) => { e.stopPropagation(); updateSpeed(video.playbackRate + 0.05); };
-    document.querySelectorAll('.pill').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); updateSpeed(btn.dataset.val); });
+      function updateSpeed(val) {
+        val = Math.max(0.5, Math.min(3, parseFloat(val)));
+        video.playbackRate = val;
+        document.getElementById('speedRange').value = val;
+        const t = val.toFixed(2).replace(/[.,]00$/, "") + 'x';
+        document.getElementById('largeSpeedLabel').textContent = t;
+        document.getElementById('currentSpeedLabel').textContent = t;
+      }
+      document.getElementById('speedRange').oninput = (e) => updateSpeed(e.target.value);
+      document.getElementById('minusBtn').onclick = (e) => { e.stopPropagation(); updateSpeed(video.playbackRate - 0.05); };
+      document.getElementById('plusBtn').onclick = (e) => { e.stopPropagation(); updateSpeed(video.playbackRate + 0.05); };
+      document.querySelectorAll('.pill').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); updateSpeed(btn.dataset.val); });
 
-    document.getElementById('volBtn').onclick = (e) => { e.stopPropagation(); video.muted = !video.muted; document.getElementById('volIcon').style.opacity = video.muted ? 0.4 : 1; };
-    document.getElementById('fullBtn').onclick = (e) => { e.stopPropagation(); if (!document.fullscreenElement) playerContainer.requestFullscreen(); else document.exitFullscreen(); };
+      document.getElementById('volBtn').onclick = (e) => { e.stopPropagation(); video.muted = !video.muted; document.getElementById('volIcon').style.opacity = video.muted ? 0.4 : 1; };
+      document.getElementById('fullBtn').onclick = (e) => { e.stopPropagation(); if (!document.fullscreenElement) playerContainer.requestFullscreen(); else document.exitFullscreen(); };
+    })();
   </script>
 </body>
 </html>
