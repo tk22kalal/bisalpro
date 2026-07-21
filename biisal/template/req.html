@@ -5,181 +5,217 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
-    
-    <!-- Video.js CSS -->
+    <!-- Video.js Base CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Delius&display=swap" rel="stylesheet">
     
     <style>
         :root {
-            --primary-color: #4f46e5;
-            --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-            --glass-bg: rgba(26, 26, 46, 0.95);
+            --vjs-theme-color: #ffffff;
+            --control-bg: rgba(20, 20, 20, 0.6);
+            --blur-effect: blur(12px);
+            --border-radius: 24px;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            background: var(--bg-gradient);
-            font-family: 'Raleway', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #050505;
+            font-family: 'Inter', sans-serif;
             color: white;
-            min-height: 100vh;
-            overflow-x: hidden;
-            /* Prevent text selection but allow interaction with player */
-            -webkit-user-select: none;
-            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 100vh;
-        }
-
-        /* File Info Bar */
-        .file-info {
-            background: var(--glass-bg);
-            padding: 15px 20px;
-            border-radius: 12px 12px 0 0;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-bottom: none;
-            overflow: hidden;
-        }
-
-        .file-name-marquee {
-            font-family: 'Delius', cursive;
-            font-size: 18px;
-            font-weight: 600;
-            white-space: nowrap;
-            display: inline-block;
-            animation: marquee 15s linear infinite;
-        }
-
-        @keyframes marquee {
-            0% { transform: translateX(100vw); }
-            100% { transform: translateX(-100%); }
-        }
-
-        /* Player Wrapper */
-        .player-wrapper {
+            width: 95%;
+            max-width: 1100px;
             position: relative;
-            background: #000;
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-            border: 1px solid rgba(255,255,255,0.1);
-            overflow: hidden;
         }
 
-        /* Video.js Customization */
-        .video-js {
+        /* File Name Styling */
+        .header-info {
+            position: absolute;
+            top: -40px;
+            left: 10px;
             width: 100%;
-            aspect-ratio: 16/9;
+            z-index: 10;
+        }
+        .marquee-text {
+            font-family: 'Delius', cursive;
+            font-size: 16px;
+            color: rgba(255,255,255,0.8);
+            white-space: nowrap;
         }
 
-        /* Change Big Play Button to a Circle */
+        /* Video Wrapper */
+        .player-card {
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #000;
+        }
+
+        /* --- VIDEO.JS CUSTOM THEME --- */
+        .video-js {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+        }
+
+        /* Floating Pill Control Bar */
+        .video-js .vjs-control-bar {
+            display: flex;
+            width: 92% !important;
+            height: 64px !important;
+            bottom: 20px !important;
+            left: 4% !important;
+            right: 4% !important;
+            border-radius: var(--border-radius) !important;
+            background-color: var(--control-bg) !important;
+            backdrop-filter: var(--blur-effect);
+            -webkit-backdrop-filter: var(--blur-effect);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 15px;
+            align-items: center;
+        }
+
+        /* Custom Play Button in Center */
         .vjs-big-play-button {
-            background-color: rgba(79, 70, 229, 0.7) !important;
-            border-radius: 50% !important;
             width: 80px !important;
             height: 80px !important;
             line-height: 80px !important;
-            margin-top: -40px !important;
-            margin-left: -40px !important;
-            border: 2px solid #fff !important;
+            border-radius: 50% !important;
+            background: rgba(255,255,255,0.15) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            transition: all 0.3s ease !important;
+        }
+        .video-js:hover .vjs-big-play-button {
+            background: rgba(255,255,255,0.25) !important;
+            transform: translate(-50%, -50%) scale(1.1) !important;
         }
 
-        /* Modern Control Bar */
-        .vjs-control-bar {
-            background: linear-gradient(transparent, rgba(0,0,0,0.9)) !important;
-            height: 50px !important;
+        /* Seek Bar (Progress) */
+        .vjs-progress-control {
+            position: absolute !important;
+            width: 100% !important;
+            height: 6px !important;
+            top: -12px !important;
+            left: 0 !important;
+        }
+        .vjs-progress-holder {
+            margin: 0 !important;
+            height: 100% !important;
+            border-radius: 10px !important;
+        }
+        .vjs-play-progress {
+            background: #fff !important; /* Pure white bar like images */
+            border-radius: 10px !important;
+        }
+        .vjs-play-progress:before {
+            font-size: 14px !important;
+            top: -4px !important;
         }
 
-        /* Loading Spinner Overlay */
-        .loading {
+        /* Icons Styling */
+        .vjs-button > .vjs-icon-placeholder:before {
+            font-size: 24px !important;
+            line-height: 64px !important;
+        }
+
+        /* Time Display */
+        .vjs-current-time, .vjs-duration {
+            display: block !important;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Custom Skip Icons */
+        .skip-icon {
+            cursor: pointer;
+            padding: 0 10px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.9;
+        }
+        .skip-icon:hover { opacity: 1; }
+
+        /* Loader */
+        #loader {
             position: fixed;
             inset: 0;
             background: #000;
-            z-index: 9999;
+            z-index: 100;
             display: flex;
             justify-content: center;
             align-items: center;
             transition: opacity 0.5s;
         }
-        .loading.hidden { opacity: 0; pointer-events: none; }
-        
         .spinner {
-            width: 50px; height: 50px;
+            width: 40px; height: 40px;
             border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid var(--primary-color);
+            border-top-color: #fff;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        @media (max-width: 768px) {
-            .container { padding: 10px; }
-            .file-name-marquee { font-size: 14px; }
+        @media (max-width: 600px) {
+            .video-js .vjs-control-bar {
+                height: 55px !important;
+                bottom: 10px !important;
+            }
+            .vjs-current-time, .vjs-duration, .vjs-volume-panel { display: none !important; }
         }
     </style>
 </head>
 <body>
 
-    <div class="loading" id="loader"><div class="spinner"></div></div>
+    <div id="loader"><div class="spinner"></div></div>
 
     <div class="container">
-        <div class="file-info">
-            <div class="file-name-marquee">{{ file_name }}</div>
+        <div class="header-info">
+            <div class="marquee-text">{{ file_name }}</div>
         </div>
 
-        <div class="player-wrapper">
-            <!-- Latest Video.js Setup -->
+        <div class="player-card">
             <video 
-                id="main-player" 
-                class="video-js vjs-big-play-centered vjs-show-big-play-button-on-pause"
+                id="my-video" 
+                class="video-js vjs-big-play-centered" 
                 playsinline 
                 preload="auto">
-                <p class="vjs-no-js">To view this video please enable JavaScript</p>
             </video>
         </div>
     </div>
 
-    <!-- Video.js Core Script -->
+    <!-- Video.js Library -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
 
     <script>
-        // Security: Prevent context menu and selection
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        
-        const videoUrl = "{{ file_url }}";
-        const loader = document.getElementById('loader');
-
-        // Determine type (HLS or MP4)
-        const videoType = videoUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+        const videoSrc = "{{ file_url }}";
+        const isHLS = videoSrc.includes('.m3u8');
 
         // Initialize Player
-        const player = videojs('main-player', {
+        const player = videojs('my-video', {
             controls: true,
-            autoplay: false,
             fluid: true,
-            responsive: true,
-            playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
-            userActions: {
-                hotkeys: true,
-                doubleClick: false // We will handle custom skip logic
-            },
+            playbackRates: [0.5, 1, 1.5, 2],
             controlBar: {
                 children: [
                     'playToggle',
-                    'volumePanel',
                     'currentTimeDisplay',
-                    'timeDivider',
-                    'durationDisplay',
                     'progressControl',
+                    'durationDisplay',
+                    'volumePanel',
                     'playbackRateMenuButton',
                     'fullscreenToggle',
                 ]
@@ -188,64 +224,51 @@
 
         // Set Source
         player.src({
-            src: videoUrl,
-            type: videoType
+            src: videoSrc,
+            type: isHLS ? 'application/x-mpegURL' : 'video/mp4'
         });
 
-        // Hide Loader
-        player.on('ready', () => {
-            loader.classList.add('hidden');
-        });
-
-        // Error Handling & Auto Retry
-        let retryCount = 0;
-        player.on('error', () => {
-            if (retryCount < 3) {
-                retryCount++;
-                console.log('Retrying connection...');
-                setTimeout(() => {
-                    player.src({ src: videoUrl, type: videoType });
-                    player.load();
-                    player.play();
-                }, 2000);
-            }
-        });
-
-        /* --- CUSTOM SKIP LOGIC (DOUBLE CLICK/TAP) --- */
-        let lastTap = 0;
-        const playerElement = document.getElementById('main-player');
-
-        const handleDoubleTap = (e) => {
-            const now = Date.now();
-            const TIMESPAN = 300; // ms
+        // Add Custom Skip Buttons (Rewind & Forward 10s)
+        const createSkipButton = (direction) => {
+            const btn = document.createElement('div');
+            btn.className = `vjs-control skip-icon`;
+            btn.innerHTML = direction === 'back' ? 
+                `<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12.5 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.31 2.69-6 6-6s6 2.69 6 6-2.69 6-6 6c-1.66 0-3.17-.67-4.24-1.76l-1.42 1.42C8.13 19.42 9.96 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-2.42 12V9.38h-.12l-1.21.87V11.4l1.21-.85h.12V15h1zm4.92-3c0-1.66-.36-3-1.42-3-1.06 0-1.42 1.34-1.42 3s.36 3 1.42 3c1.06 0 1.42-1.34 1.42-3zm-1.42 2.11c-.48 0-.58-.83-.58-2.11s.1-2.11.58-2.11.58.83.58 2.11-.1 2.11-.58 2.11z"/></svg>` :
+                `<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M11.5 3c4.97 0 9 4.03 9 9H23l-3.89 3.89-.07.14L15 12h3c0-3.31-2.69-6-6-6s-6 2.69-6 6 2.69 6 6 6c1.66 0 3.17-.67 4.24-1.76l1.42 1.42C15.87 19.42 14.04 20 12 20c-4.97 0-9-4.03-9-9s4.03-9 9-9zm-2.42 12V9.38h-.12l-1.21.87V11.4l1.21-.85h.12V15h1zm4.92-3c0-1.66-.36-3-1.42-3-1.06 0-1.42 1.34-1.42 3s.36 3 1.42 3c1.06 0 1.42-1.34 1.42-3zm-1.42 2.11c-.48 0-.58-.83-.58-2.11s.1-2.11.58-2.11.58.83.58 2.11-.1 2.11-.58 2.11z"/></svg>`;
             
-            if (now - lastTap < TIMESPAN) {
-                const rect = playerElement.getBoundingClientRect();
-                const x = (e.type === 'touchend') ? e.changedTouches[0].clientX - rect.left : e.clientX - rect.left;
-                const width = rect.width;
-
-                if (x < width / 3) {
-                    // Left 1/3: Rewind 10s
-                    player.currentTime(Math.max(0, player.currentTime() - 10));
-                } else if (x > (width * 2) / 3) {
-                    // Right 1/3: Forward 10s
-                    player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
-                }
-            }
-            lastTap = now;
+            btn.onclick = () => {
+                const time = player.currentTime();
+                player.currentTime(direction === 'back' ? time - 10 : time + 10);
+            };
+            return btn;
         };
 
-        // Desktop Double Click
-        player.on('mousedown', handleDoubleTap);
-        // Mobile Double Tap
-        player.on('touchend', handleDoubleTap);
-
-        // Security: Block keyboard shortcuts for saving
-        document.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-                e.preventDefault();
-            }
+        player.ready(() => {
+            const controlBar = player.controlBar.el();
+            const playToggle = player.controlBar.playToggle.el();
+            // Insert Skip Back after Play button, Skip Forward after that
+            controlBar.insertBefore(createSkipButton('back'), playToggle.nextSibling);
+            controlBar.insertBefore(createSkipButton('forward'), playToggle.nextSibling.nextSibling);
+            
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
         });
+
+        // Double Tap Skip Logic
+        let lastTap = 0;
+        player.on('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                const rect = player.el().getBoundingClientRect();
+                const x = e.changedTouches[0].clientX - rect.left;
+                if (x < rect.width / 2) player.currentTime(player.currentTime() - 10);
+                else player.currentTime(player.currentTime() + 10);
+            }
+            lastTap = now;
+        });
+
+        // Disable Right Click
+        document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>
 </html>
