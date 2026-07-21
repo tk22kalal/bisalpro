@@ -5,50 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
     
     <style>
+        /* ----- Custom Page & Loader Styles ----- */
+        :root {
+            --primary-color: #4f46e5;
+            --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            --glass-bg: rgba(26, 26, 46, 0.95);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: #000;
+            background: var(--bg-gradient);
             font-family: 'Raleway', sans-serif;
             color: white;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow-x: hidden;
             -webkit-user-select: none;
             user-select: none;
         }
 
-        .player-wrapper {
-            position: relative;
-            width: 100%;
-            height: 100vh;
-            background: #000;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* File Info Bar */
+        .file-info {
+            background: var(--glass-bg);
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-bottom: none;
             overflow: hidden;
         }
 
-        /* Title overlay – transparent, on top of the video */
-        .file-info {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 5;
-            padding: 16px 24px;
-            background: transparent;
+        .file-name-marquee {
             font-family: 'Delius', cursive;
             font-size: 18px;
             font-weight: 600;
-            color: #fff;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-            pointer-events: none;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: inline-block;
+            animation: marquee 15s linear infinite;
         }
 
-        /* Loading spinner */
+        @keyframes marquee {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* Player Wrapper */
+        .player-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+        }
+
+        /* Loading Spinner Overlay */
         .loading {
             position: fixed;
             inset: 0;
@@ -64,23 +88,19 @@
         .spinner {
             width: 50px; height: 50px;
             border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid #4f46e5;
+            border-top: 3px solid var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 768px) {
-            .file-info {
-                font-size: 16px;
-                padding: 12px 16px;
-            }
+            .container { padding: 10px; }
+            .file-name-marquee { font-size: 14px; }
         }
 
-        /* =========================================
-           INSERT THE COMPLETE player.css HERE
-           (everything from the first comment to the end)
-           ========================================= */
+        /* ----- Embedding the complete player.css (video-minimal-skin) ----- */
+        /* (all the CSS provided in the prompt, placed here directly) */
         /* -------------------------------------------------------------------------- */
 /* Global styles for the host document, outside of the Shadow DOM             */
 /* -------------------------------------------------------------------------- */
@@ -141,26 +161,26 @@ media-container {
    Reset
    ========================================================================== */
 
-.media-default-skin *,
-.media-default-skin *::before,
-.media-default-skin *::after {
+.media-minimal-skin *,
+.media-minimal-skin *::before,
+.media-minimal-skin *::after {
   box-sizing: border-box;
 }
-.media-default-skin img,
-.media-default-skin video,
-.media-default-skin svg {
+.media-minimal-skin img,
+.media-minimal-skin video,
+.media-minimal-skin svg {
   display: block;
   max-width: 100%;
 }
-.media-default-skin button {
+.media-minimal-skin button {
   font: inherit;
 }
-.media-default-skin [hidden][hidden] {
+.media-minimal-skin [hidden][hidden] {
   /* Keep authored templates hidden even when component classes set display. */
   display: none;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .media-default-skin {
+  .media-minimal-skin {
     interpolate-size: allow-keywords;
   }
 }
@@ -169,7 +189,7 @@ media-container {
    Root Container
    ========================================================================== */
 
-.media-default-skin {
+.media-minimal-skin {
   --media-current-shadow-color: oklch(from currentColor 0 0 0 / clamp(0, calc((l - 0.5) * 0.5), 0.15));
   --media-current-shadow-color-subtle: oklch(from var(--media-current-shadow-color) l c h / calc(alpha * 0.4));
   --media-icon-size: 18px;
@@ -194,7 +214,7 @@ media-container {
   outline-offset: -4px;
   scrollbar-color: var(--media-color-scrollbar-thumb) transparent;
   scrollbar-width: thin;
-  border-radius: var(--media-border-radius, 2rem);
+  border-radius: var(--media-border-radius, 0.75rem);
   isolation: isolate;
   transition-timing-function: ease-out;
   transition-duration: 100ms;
@@ -217,50 +237,26 @@ media-container {
 }
 
 /* ==========================================================================
-   Surface (shared glass effect for tooltips, popovers, controls)
-   ========================================================================== */
-
-.media-default-skin .media-surface {
-  background-color: var(--media-surface-background-color);
-  box-shadow:
-    0 0 0 1px var(--media-surface-outer-border-color),
-    0 1px 3px 0 var(--media-surface-shadow-color),
-    0 1px 2px -1px var(--media-surface-shadow-color);
-  backdrop-filter: var(--media-surface-backdrop-filter);
-
-  /* Inner border ring */
-  &::after {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    pointer-events: none;
-    content: "";
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 1px var(--media-surface-inner-border-color);
-  }
-}
-
-/* ==========================================================================
    Media Element
    ========================================================================== */
 
-.media-default-skin ::slotted(video),
-.media-default-skin video {
+.media-minimal-skin ::slotted(video),
+.media-minimal-skin video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: var(--media-object-fit, contain);
   object-position: var(--media-object-position, center);
 }
-.media-default-skin ::slotted(video) {
+.media-minimal-skin ::slotted(video) {
   border-radius: var(--media-video-border-radius);
 }
-.media-default-skin video {
+.media-minimal-skin video {
   border-radius: inherit;
 }
 
-.media-default-skin:fullscreen ::slotted(video),
-.media-default-skin:fullscreen video {
+.media-minimal-skin:fullscreen ::slotted(video),
+.media-minimal-skin:fullscreen video {
   object-fit: contain;
 }
 
@@ -268,11 +264,11 @@ media-container {
    Overlay / Scrim
    ========================================================================== */
 
-.media-default-skin .media-overlay {
+.media-minimal-skin .media-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(to top, oklch(0 0 0 / 0.5), oklch(0 0 0 / 0.3) 25%, oklch(0 0 0 / 0));
+  background-image: linear-gradient(to top, oklch(0 0 0 / 0.7), oklch(0 0 0 / 0.5) 7.5rem, oklch(0 0 0 / 0));
   border-radius: inherit;
   opacity: 0;
   backdrop-filter: blur(0) saturate(1);
@@ -281,31 +277,31 @@ media-container {
   transition-property: opacity, backdrop-filter;
 }
 
-.media-default-skin .media-error ~ .media-overlay {
+.media-minimal-skin .media-error ~ .media-overlay {
   transition-delay: var(--media-error-dialog-transition-delay);
   transition-duration: var(--media-error-dialog-transition-duration);
 }
 
-.media-default-skin .media-controls[data-visible] ~ .media-overlay,
-.media-default-skin .media-error[data-open] ~ .media-overlay {
+.media-minimal-skin .media-controls[data-visible] ~ .media-overlay,
+.media-minimal-skin .media-error[data-open] ~ .media-overlay {
   opacity: 1;
 }
 
-.media-default-skin .media-buffering-indicator[data-visible] ~ .media-overlay {
+.media-minimal-skin .media-buffering-indicator[data-visible] ~ .media-overlay {
   background: oklch(0 0 0 / 0.35);
   opacity: 1;
   backdrop-filter: blur(8px);
 }
 
-.media-default-skin .media-error[data-open] ~ .media-overlay {
-  backdrop-filter: blur(16px) saturate(1.5);
+.media-minimal-skin .media-error[data-open] ~ .media-overlay {
+  backdrop-filter: blur(16px) saturate(1.2);
 }
 
 /* ==========================================================================
    Buffering Indicator
    ========================================================================== */
 
-.media-default-skin .media-buffering-indicator {
+.media-minimal-skin .media-buffering-indicator {
   position: absolute;
   inset: 0;
   z-index: 10;
@@ -327,25 +323,21 @@ media-container {
    Error Dialog
    ========================================================================== */
 
-.media-default-skin .media-error {
-  outline: none;
-}
-
-.media-default-skin .media-error:not([data-open]) {
+.media-minimal-skin .media-error:not([data-open]) {
   display: none;
 }
 
-.media-default-skin .media-error__title {
+.media-minimal-skin .media-error__title {
   font-weight: 600;
   line-height: 1.25;
 }
 
-.media-default-skin .media-error__description {
+.media-minimal-skin .media-error__description {
   overflow-wrap: anywhere;
   opacity: 0.7;
 }
 
-.media-default-skin .media-error__actions {
+.media-minimal-skin .media-error__actions {
   display: flex;
   gap: 0.5rem;
 
@@ -354,7 +346,7 @@ media-container {
   }
 }
 
-.media-default-skin .media-error[data-open] ~ .media-controls * {
+.media-minimal-skin .media-error[data-open] ~ .media-controls * {
   visibility: hidden;
 }
 
@@ -362,34 +354,39 @@ media-container {
    Controls
    ========================================================================== */
 
-.media-default-skin .media-controls {
+.media-minimal-skin .media-controls {
   display: flex;
-  column-gap: 0.075rem;
   align-items: center;
-  padding: 0.375rem;
   container: media-controls / inline-size;
   text-shadow: 0 1px 0 var(--media-current-shadow-color);
-  border-radius: 1.5rem;
+  background-color: var(--media-controls-background-color);
+  backdrop-filter: var(--media-controls-backdrop-filter);
 }
 
 /* ==========================================================================
-   Time Display
+   Time Controls & Display
    ========================================================================== */
 
-.media-default-skin .media-time-controls {
+.media-minimal-skin .media-time-controls {
   display: flex;
   flex: 1;
+  flex-direction: row-reverse;
   gap: 0.75rem;
   align-items: center;
-  padding-inline: 0.5rem;
   container: media-time-controls / inline-size;
 }
 
-.media-default-skin .media-time {
+.media-minimal-skin .media-time-group {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.media-minimal-skin .media-time {
   font-variant-numeric: tabular-nums;
 }
 
-.media-default-skin .media-time[role="button"] {
+.media-minimal-skin .media-time[role="button"] {
   cursor: pointer;
   outline: 2px solid transparent;
   outline-offset: -2px;
@@ -398,9 +395,35 @@ media-container {
   transition-duration: 100ms;
   transition-property: outline-color, outline-offset;
 
+  @supports (corner-shape: squircle) {
+    border-radius: 1rem;
+    corner-shape: squircle;
+  }
+
   &:focus-visible {
     outline-color: currentColor;
     outline-offset: 2px;
+  }
+}
+
+.media-minimal-skin .media-time--current,
+.media-minimal-skin .media-time-separator {
+  display: none;
+}
+
+@container media-root (width > 42rem) {
+  .media-minimal-skin .media-time-controls {
+    flex-direction: row;
+  }
+
+  .media-minimal-skin .media-time--duration,
+  .media-minimal-skin .media-time-separator {
+    color: oklch(from currentColor l c h / 0.6);
+  }
+
+  .media-minimal-skin .media-time--current,
+  .media-minimal-skin .media-time-separator {
+    display: inline;
   }
 }
 
@@ -409,7 +432,7 @@ media-container {
    ========================================================================== */
 
 /* Base button */
-.media-default-skin .media-button {
+.media-minimal-skin .media-button {
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -423,7 +446,7 @@ media-container {
   outline: 2px solid transparent;
   outline-offset: -2px;
   border: none;
-  border-radius: calc(infinity * 1px);
+  border-radius: 0.5rem;
   transition-timing-function: ease-out;
   transition-duration: 150ms;
   transition-property: background-color, outline-offset, scale;
@@ -451,8 +474,15 @@ media-container {
   }
 }
 
+@supports (corner-shape: squircle) {
+  .media-minimal-skin .media-button {
+    border-radius: 1rem;
+    corner-shape: squircle;
+  }
+}
+
 /* Primary button variant */
-.media-default-skin .media-button--primary {
+.media-minimal-skin .media-button--primary {
   font-weight: 500;
   color: oklch(0 0 0);
   text-shadow: none;
@@ -460,7 +490,7 @@ media-container {
 }
 
 /* Subtle button variant */
-.media-default-skin .media-button--subtle {
+.media-minimal-skin .media-button--subtle {
   color: inherit;
   text-shadow: inherit;
   background: transparent;
@@ -468,15 +498,14 @@ media-container {
   &:hover,
   &:focus-visible,
   &[aria-expanded="true"] {
-    text-decoration: none;
-    background-color: oklch(from currentColor l c h / 0.1);
+    background: oklch(from currentColor l c h / 0.1);
   }
 }
 
 /* Icon button variant */
-.media-default-skin .media-button--icon {
+.media-minimal-skin .media-button--icon {
   display: grid;
-  width: 2.25rem;
+  width: 2.375rem;
   aspect-ratio: 1;
   padding: 0;
 
@@ -499,12 +528,12 @@ media-container {
 }
 
 /* Seek button */
-.media-default-skin .media-button--seek {
+.media-minimal-skin .media-button--seek {
   & .media-icon__label {
     position: absolute;
     right: -1px;
     bottom: -3px;
-    font-size: 10px;
+    font-size: 10px; /* Hard coded due to size limitations. */
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.05em;
@@ -517,7 +546,7 @@ media-container {
 }
 
 /* Playback rate button */
-.media-default-skin .media-button--playback-rate {
+.media-minimal-skin .media-button--playback-rate {
   padding: 0;
   font-variant-numeric: tabular-nums;
 
@@ -532,7 +561,7 @@ media-container {
 }
 
 /* Settings button */
-.media-default-skin .media-button--settings {
+.media-minimal-skin .media-button--settings {
   display: none;
 
   & .media-icon--settings {
@@ -548,14 +577,14 @@ media-container {
   }
 }
 
-.media-default-skin .media-button-group:has([data-availability="available"]) .media-button--settings {
+.media-minimal-skin .media-button-group:has([data-availability="available"]) .media-button--settings {
   display: grid;
 }
 
 /* Live button — wide pill button with a status dot (gray → red at the live
    edge) rendered via ::before, and "LIVE" text rendered as the button's own
    text content. */
-.media-default-skin .media-button--live {
+.media-minimal-skin .media-button--live {
   display: inline-flex;
   gap: 0.4rem;
   align-items: center;
@@ -588,7 +617,7 @@ media-container {
    Button Groups
    ========================================================================== */
 
-.media-default-skin .media-button-group {
+.media-minimal-skin .media-button-group {
   display: flex;
   gap: 0.075rem;
   align-items: center;
@@ -602,31 +631,31 @@ media-container {
    Badge
    ========================================================================== */
 
-.media-default-skin .media-badge {
-  padding: 0.125rem 0.375rem;
+.media-minimal-skin .media-badge {
+  padding: 0.25rem 0.375rem;
   font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1;
   color: oklch(from currentColor l c h / 0.85);
   white-space: nowrap;
   background-color: oklch(from currentColor l c h / 0.1);
-  border-radius: calc(infinity * 1px);
+  border-radius: 0.25rem;
 }
 
 /* ==========================================================================
    Icons
    ========================================================================== */
 
-.media-default-skin .media-icon__container {
+.media-minimal-skin .media-icon__container {
   position: relative;
 }
 
-.media-default-skin .media-icon {
+.media-minimal-skin .media-icon {
   flex-shrink: 0;
   width: var(--media-icon-size);
   height: var(--media-icon-size);
 }
-.media-default-skin .media-icon--flipped {
+.media-minimal-skin .media-icon--flipped {
   scale: -1 1;
 }
 
@@ -634,8 +663,8 @@ media-container {
    Poster Image
    ========================================================================== */
 
-.media-default-skin media-poster,
-.media-default-skin > img {
+.media-minimal-skin media-poster,
+.media-minimal-skin > img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -643,13 +672,13 @@ media-container {
   pointer-events: none;
   transition: opacity 0.25s;
 }
-.media-default-skin media-poster:not([data-visible]),
-.media-default-skin > img:not([data-visible]),
-.media-default-skin > img[data-visible]:not([data-loaded]) {
+.media-minimal-skin media-poster:not([data-visible]),
+.media-minimal-skin > img:not([data-visible]),
+.media-minimal-skin > img[data-visible]:not([data-loaded]) {
   opacity: 0;
 }
-.media-default-skin media-poster ::slotted(img),
-.media-default-skin media-poster img {
+.media-minimal-skin media-poster ::slotted(img),
+.media-minimal-skin media-poster img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -658,15 +687,15 @@ media-container {
   object-position: var(--media-object-position, center);
   border-radius: var(--media-video-border-radius);
 }
-.media-default-skin > img {
+.media-minimal-skin > img {
   object-fit: var(--media-object-fit, contain);
   object-position: var(--media-object-position, center);
   border-radius: inherit;
 }
 
 /* Blurred placeholder: HTML path targets media-poster::before, React path targets the skin container::before */
-.media-default-skin media-poster::before,
-.media-default-skin::before {
+.media-minimal-skin media-poster::before,
+.media-minimal-skin::before {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -679,18 +708,18 @@ media-container {
 }
 
 /* React path: hidden by default, transitions in while poster loads */
-.media-default-skin::before {
+.media-minimal-skin::before {
   opacity: 0;
   transition: opacity 0.25s;
 }
 /* Show placeholder while the poster is visible but not yet loaded */
-.media-default-skin:has(img[data-visible]:not([data-loaded]))::before {
+.media-minimal-skin:has(img[data-visible]:not([data-loaded]))::before {
   opacity: 1;
 }
 
-.media-default-skin:fullscreen media-poster ::slotted(img),
-.media-default-skin:fullscreen media-poster img,
-.media-default-skin:fullscreen > img {
+.media-minimal-skin:fullscreen media-poster ::slotted(img),
+.media-minimal-skin:fullscreen media-poster img,
+.media-minimal-skin:fullscreen > img {
   object-fit: contain;
 }
 
@@ -698,31 +727,27 @@ media-container {
    Media thumbnail
    ========================================================================== */
 
-.media-default-skin .media-thumbnail {
+.media-minimal-skin .media-thumbnail {
   pointer-events: none;
-  background-color: oklch(0 0 0 / 0.9);
-  border-radius: 0.75rem;
 
-  & .media-thumbnail__image {
+  & .media-thumbnail__image-wrapper {
     position: relative;
+    background-color: oklch(0 0 0 / 0.9);
+    border-radius: 0.5rem;
+  }
+  & .media-thumbnail__image {
     display: block;
-    overflow: clip;
     border-radius: inherit;
-
-    &::after {
-      position: absolute;
-      inset: 0;
-      content: "";
-      background-image: linear-gradient(to top, oklch(0 0 0 / 0.8), oklch(0 0 0 / 0.3), oklch(0 0 0 / 0));
-      border-radius: inherit;
-    }
   }
 
   & .media-thumbnail__time {
-    position: absolute;
-    inset-inline: 0;
-    bottom: 0.5rem;
+    display: block;
+    margin-top: 0.5rem;
     text-align: center;
+  }
+
+  & .media-overlay {
+    opacity: 1;
   }
 
   & .media-thumbnail__spinner {
@@ -758,7 +783,7 @@ media-container {
    Slider
    ========================================================================== */
 
-.media-default-skin .media-slider {
+.media-minimal-skin .media-slider {
   position: relative;
   display: flex;
   flex: 1;
@@ -776,49 +801,52 @@ media-container {
 
   &[data-orientation="vertical"] {
     width: 2rem;
-    height: 5rem;
+    height: 4.5rem;
   }
 }
 
 /* Track */
-.media-default-skin .media-slider__track {
+.media-minimal-skin .media-slider__track {
   position: relative;
   overflow: hidden;
   user-select: none;
+  background-color: oklch(from currentColor l c h / 0.2);
   border-radius: inherit;
   isolation: isolate;
 
   &[data-orientation="horizontal"] {
     width: 100%;
-    height: 0.25rem;
+    height: 0.1875rem;
   }
 
   &[data-orientation="vertical"] {
-    width: 0.25rem;
+    width: 0.1875rem;
     height: 100%;
   }
 }
 
 /* Thumb */
-.media-default-skin .media-slider__thumb {
+.media-minimal-skin .media-slider__thumb {
   position: absolute;
   z-index: 10;
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.75rem;
+  height: 0.75rem;
   user-select: none;
-  outline: 4px solid transparent;
-  outline-offset: -4px;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
   background-color: currentColor;
   border-radius: calc(infinity * 1px);
   box-shadow:
-    0 0 0 1px var(--media-current-shadow-color, oklch(0 0 0 / 0.1)),
-    0 1px 3px 0 oklch(0 0 0 / 0.35),
-    0 1px 2px -1px oklch(0 0 0 / 0.35);
+    0 0 0 1px var(--media-current-shadow-color, oklch(0 0 0 / 0.15)),
+    0 1px 3px 0 oklch(0 0 0 / 0.15),
+    0 1px 2px -1px oklch(0 0 0 / 0.15);
   opacity: 0;
+  transform-origin: center;
+  scale: 0.7;
   translate: -50% -50%;
   transition-timing-function: ease-out;
   transition-duration: 150ms;
-  transition-property: opacity, height, width, outline-offset;
+  transition-property: opacity, scale, outline-offset;
 
   &[data-orientation="horizontal"] {
     top: 50%;
@@ -830,43 +858,21 @@ media-container {
     left: 50%;
   }
 
-  &:hover,
-  &:focus {
-    outline-color: oklch(from currentColor l c h / 0.15);
-    outline-offset: 0;
-  }
-
-  &::after {
-    position: absolute;
-    inset: -4px;
-    content: "";
-    border-radius: inherit;
-    box-shadow: 0 0 0 2px currentColor;
-    transition-timing-function: ease-out;
-    transition-duration: 150ms;
-    transition-property: opacity, scale;
-  }
-
-  &:not(:focus-visible)::after {
-    opacity: 0;
-    scale: 0.5;
+  &:focus-visible {
+    outline-color: currentColor;
+    outline-offset: 2px;
   }
 }
 
-.media-default-skin .media-slider:active .media-slider__thumb,
-.media-default-skin .media-slider__thumb--persistent {
-  width: 0.75rem;
-  height: 0.75rem;
-}
-
-.media-default-skin .media-slider:hover .media-slider__thumb,
-.media-default-skin .media-slider__thumb:focus-visible,
-.media-default-skin .media-slider__thumb--persistent {
+.media-minimal-skin .media-slider:hover .media-slider__thumb,
+.media-minimal-skin .media-slider:focus-within .media-slider__thumb,
+.media-minimal-skin .media-slider__thumb--persistent {
   opacity: 1;
+  scale: 1;
 }
 
 /* Preview */
-.media-default-skin .media-slider__preview {
+.media-minimal-skin .media-slider__preview {
   & .media-slider__value,
   &::before {
     opacity: 0;
@@ -878,7 +884,7 @@ media-container {
 
   & .media-slider__value {
     position: absolute;
-    bottom: 2.25rem;
+    bottom: 1.5rem;
     text-shadow: 0 1px 0 var(--media-current-shadow-color);
     filter: blur(8px);
     translate: -50% 0.5rem;
@@ -887,14 +893,8 @@ media-container {
 
   &::before {
     display: block;
-    min-width: 0.25rem;
-    height: 0.25rem;
     content: "";
-    background-color: currentColor;
-    border-radius: 100%;
-    box-shadow:
-      0 0 0 1px var(--media-current-shadow-color, oklch(0 0 0 / 0.15)),
-      0 1px 2px 0 oklch(0 0 0 / 0.35);
+    background-color: oklch(from currentColor l c h / 0.35);
   }
 
   &[data-pointing] .media-slider__value,
@@ -906,30 +906,40 @@ media-container {
     filter: blur(0);
     translate: -50% 0;
   }
+
+  &[data-orientation="horizontal"]::before {
+    min-width: 1px;
+    height: 1.25rem;
+  }
+
+  &[data-orientation="vertical"]::before {
+    width: 1.25rem;
+    min-height: 1px;
+  }
 }
 
 /* Shared track fills */
-.media-default-skin .media-slider__buffer,
-.media-default-skin .media-slider__fill {
+.media-minimal-skin .media-slider__buffer,
+.media-minimal-skin .media-slider__fill {
   position: absolute;
   pointer-events: none;
   border-radius: inherit;
 }
 
-.media-default-skin .media-slider__buffer[data-orientation="horizontal"],
-.media-default-skin .media-slider__fill[data-orientation="horizontal"] {
+.media-minimal-skin .media-slider__buffer[data-orientation="horizontal"],
+.media-minimal-skin .media-slider__fill[data-orientation="horizontal"] {
   inset-block: 0;
   left: 0;
 }
 
-.media-default-skin .media-slider__buffer[data-orientation="vertical"],
-.media-default-skin .media-slider__fill[data-orientation="vertical"] {
+.media-minimal-skin .media-slider__buffer[data-orientation="vertical"],
+.media-minimal-skin .media-slider__fill[data-orientation="vertical"] {
   inset-inline: 0;
   bottom: 0;
 }
 
 /* Buffer */
-.media-default-skin .media-slider__buffer {
+.media-minimal-skin .media-slider__buffer {
   background-color: oklch(from currentColor l c h / 0.2);
   transition-timing-function: ease-out;
   transition-duration: 0.25s;
@@ -946,7 +956,7 @@ media-container {
 }
 
 /* Fill */
-.media-default-skin .media-slider__fill {
+.media-minimal-skin .media-slider__fill {
   background-color: currentColor;
 
   &[data-orientation="horizontal"] {
@@ -959,27 +969,27 @@ media-container {
 }
 
 /* Dragging — thumb and fill follow the pointer position */
-.media-default-skin .media-slider[data-dragging] .media-slider__thumb[data-orientation="horizontal"] {
+.media-minimal-skin .media-slider[data-dragging] .media-slider__thumb[data-orientation="horizontal"] {
   left: var(--media-slider-pointer);
 }
 
-.media-default-skin .media-slider[data-dragging] .media-slider__thumb[data-orientation="vertical"] {
+.media-minimal-skin .media-slider[data-dragging] .media-slider__thumb[data-orientation="vertical"] {
   top: calc(100% - var(--media-slider-pointer));
 }
 
-.media-default-skin .media-slider[data-dragging] .media-slider__fill[data-orientation="horizontal"] {
+.media-minimal-skin .media-slider[data-dragging] .media-slider__fill[data-orientation="horizontal"] {
   width: var(--media-slider-pointer);
 }
 
-.media-default-skin .media-slider[data-dragging] .media-slider__fill[data-orientation="vertical"] {
+.media-minimal-skin .media-slider[data-dragging] .media-slider__fill[data-orientation="vertical"] {
   height: var(--media-slider-pointer);
 }
 
 /* ==========================================================================
-   Popups & Tooltips
+   Popups & Animations
    ========================================================================== */
 
-.media-default-skin {
+.media-minimal-skin {
   --media-popup-transition:
     opacity var(--media-popup-transition-timing-function) var(--media-popup-transition-duration),
     filter var(--media-popup-transition-timing-function) var(--media-popup-transition-duration),
@@ -987,8 +997,8 @@ media-container {
     scale var(--media-popup-transition-timing-function) var(--media-popup-transition-duration);
 }
 
-.media-default-skin .media-popover,
-.media-default-skin .media-tooltip {
+.media-minimal-skin .media-popover,
+.media-minimal-skin .media-tooltip {
   --popup-translate-distance: 0.5rem;
   margin: 0;
   overflow: visible;
@@ -1060,7 +1070,7 @@ media-container {
   }
 }
 
-.media-default-skin .media-popover {
+.media-minimal-skin .media-popover {
   &[data-side="top"]::before,
   &[data-side="bottom"]::before {
     height: var(--media-popover-side-offset);
@@ -1070,20 +1080,19 @@ media-container {
     width: var(--media-popover-side-offset);
   }
 }
-.media-default-skin .media-popover--volume {
-  padding: 0.75rem 0;
-  border-radius: calc(infinity * 1px);
 
-  &:has(media-volume-slider[data-availability="unsupported"]) {
-    display: none;
-  }
-}
-
-.media-default-skin .media-tooltip {
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
+.media-minimal-skin .media-tooltip {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem; /* 12px at 100% font size */
+  color: var(--media-tooltip-text-color);
   white-space: nowrap;
-  border-radius: calc(infinity * 1px);
+  background-color: var(--media-tooltip-background-color);
+  border-radius: 0.5rem;
+  box-shadow:
+    0 0 0 1px var(--media-tooltip-border-color),
+    0 4px 6px -1px oklch(0 0 0 / 0.2),
+    0 2px 4px -2px oklch(0 0 0 / 0.2);
+  backdrop-filter: var(--media-tooltip-backdrop-filter);
 
   /* `display: flex` must not apply while closed — it overrides UA `[popover]` hiding. */
   &[data-open] {
@@ -1104,14 +1113,19 @@ media-container {
   & .media-tooltip__kbd {
     min-width: 1.5em;
     padding: 0.1em;
+    margin-right: -0.25rem;
     font-family: inherit;
     font-size: 90%;
     font-weight: 600;
     line-height: 1.25;
     text-align: center;
-    background-color: oklch(from currentColor l c h / 0.3);
+    background-color: oklch(from currentColor l c h / 0.15);
     border-radius: 0.25rem;
   }
+}
+
+.media-minimal-skin .media-popover--volume:has(media-volume-slider[data-availability="unsupported"]) {
+  display: none;
 }
 
 /* ==========================================================================
@@ -1119,11 +1133,11 @@ media-container {
    Note: Menus use `.media-popover` styles for positioning and transitions.
    ========================================================================== */
 
-.media-default-skin .media-menu {
+.media-minimal-skin .media-menu {
   --menu-transition-duration: 250ms;
   --menu-max-height: 14rem;
-  --menu-padding: 0.25rem;
-  --menu-border-radius: 0.75rem;
+  --menu-padding: 0.5rem;
+  --menu-border-radius: 1rem;
   --menu-item-border-radius: calc(var(--menu-border-radius) - var(--menu-padding));
   box-sizing: border-box;
   max-width: var(--media-popover-available-width, none);
@@ -1131,7 +1145,13 @@ media-container {
   padding: var(--menu-padding);
   overflow: auto;
   overscroll-behavior: none;
+  background-color: var(--media-popover-background-color);
   border-radius: var(--menu-border-radius);
+  box-shadow:
+    0 0 0 1px var(--media-popover-border-color),
+    0 4px 6px -1px oklch(0 0 0 / 0.1),
+    0 2px 4px -2px oklch(0 0 0 / 0.1);
+  backdrop-filter: var(--media-popover-backdrop-filter);
 
   @media (prefers-reduced-motion: reduce) {
     --menu-transition-duration: 0ms;
@@ -1194,9 +1214,8 @@ media-container {
   }
 
   & .media-menu__separator {
-    margin-block: 0.25rem;
-    border-bottom: 1px solid oklch(0 0 0 / 0.1);
-    box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.075);
+    margin: 0.25rem 0;
+    border-bottom: 1px solid oklch(1 0 0 / 0.1);
   }
 
   & .media-menu__group {
@@ -1252,7 +1271,7 @@ media-container {
 
     & .media-icon {
       flex-shrink: 0;
-      color: oklch(from currentColor l c h / 0.65);
+      color: oklch(from currentColor l c h / 0.5);
       filter: drop-shadow(0 1px 0 var(--media-current-shadow-color));
     }
   }
@@ -1262,10 +1281,6 @@ media-container {
     margin-right: -0.25rem;
     margin-left: auto;
     opacity: 0;
-
-    & .media-icon {
-      filter: drop-shadow(0 1px 0 var(--media-current-shadow-color));
-    }
   }
 
   & .media-menu__item {
@@ -1350,23 +1365,23 @@ media-container {
    Native Caption Track
    ========================================================================== */
 
-.media-default-skin {
+.media-minimal-skin {
   --media-caption-track-duration: var(--media-controls-transition-duration);
   --media-caption-track-delay: 25ms;
   --media-caption-track-y: -0.5rem;
 
   &:has(.media-controls[data-visible]) {
-    --media-caption-track-y: -5.5rem;
+    --media-caption-track-y: -5rem;
   }
 
   @container media-root (width > 42rem) {
     &:has(.media-controls[data-visible]) > * {
-      --media-caption-track-y: -3.5rem;
+      --media-caption-track-y: -3rem;
     }
   }
 }
 
-.media-default-skin video::-webkit-media-text-track-container {
+.media-minimal-skin video::-webkit-media-text-track-container {
   z-index: 1;
   font-family: inherit;
   scale: 0.98;
@@ -1379,7 +1394,7 @@ media-container {
    Input Feedback
    ========================================================================== */
 
-.media-default-skin .media-input-feedback {
+.media-minimal-skin .media-input-feedback {
   position: absolute;
   inset-inline: 0;
   top: 0;
@@ -1388,8 +1403,10 @@ media-container {
   grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   justify-items: center;
+  overflow: hidden;
   color: var(--media-color-primary, oklch(1 0 0));
   pointer-events: none;
+  border-radius: inherit;
 
   @container media-root (width > 24rem) {
     bottom: 0;
@@ -1398,14 +1415,18 @@ media-container {
 
 /* --- Feedback islands ------------------------------------------------------- */
 
-.media-default-skin .media-input-feedback-island {
-  --media-surface-background-color: oklch(0 0 0 / 0.25);
+.media-minimal-skin .media-input-feedback-island {
   position: absolute;
-  top: 0.75rem;
-  font-weight: 500;
+  inset-inline: 0;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: 0.75rem;
+  padding-bottom: 8rem;
   color: inherit;
+  text-shadow: 0 1px 0 var(--media-current-shadow-color);
   pointer-events: none;
-  border-radius: calc(Infinity * 1px);
+  background-image: linear-gradient(to bottom, oklch(0 0 0 / 0.35), oklch(0 0 0 / 0.2) 3rem, oklch(0 0 0 / 0));
   transform-origin: top center;
   transition-timing-function: ease-out;
   transition-duration: 100ms;
@@ -1415,36 +1436,38 @@ media-container {
     gap: 0.5rem;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
     padding: 0.25rem 0.625rem;
-
-    /* Increase contrast of the content */
-    * {
-      mix-blend-mode: difference;
-    }
   }
 
   .media-icon {
     display: none;
     flex-shrink: 0;
+    filter: drop-shadow(0 1px 0 var(--media-current-shadow-color));
   }
 
   .media-input-feedback-island__value {
     margin-left: auto;
   }
 
+  @media (pointer: fine) {
+    transition-property: translate, filter, opacity;
+    will-change: translate, filter, opacity;
+  }
+
   @media (pointer: coarse) {
-    transition-property: scale, translate, opacity;
-    will-change: scale, translate, opacity;
+    transition-property: translate, opacity;
+    will-change: translate, opacity;
   }
 
   @media (pointer: fine) and (prefers-reduced-motion: no-preference) {
-    transition-property: scale, translate, filter, opacity;
-    will-change: scale, translate, filter, opacity;
+    transition-property: translate, filter, opacity;
   }
 
   @media (prefers-reduced-transparency: reduce) or (prefers-contrast: more) {
-    --media-surface-background-color: oklch(0 0 0);
+    .media-input-feedback-island__content {
+      background: var(--media-controls-background-color);
+      border-radius: 0.5rem;
+    }
   }
 
   /* Default hidden state */
@@ -1452,35 +1475,38 @@ media-container {
   &[data-ending-style] {
     opacity: 0;
     transition-timing-function: ease-in;
-    transition-duration: 250ms;
+    transition-duration: 400ms;
 
     @media (pointer: fine) and (prefers-reduced-motion: no-preference) {
       filter: blur(8px);
-      scale: 0.9;
     }
 
     @media (prefers-reduced-motion: no-preference) {
       &[data-ending-style] {
-        translate: 0 -25%;
+        translate: 0 -100%;
       }
     }
   }
 }
 
-.media-default-skin .media-input-feedback-island--volume {
-  width: min(80%, 12rem);
-
+.media-minimal-skin .media-input-feedback-island--volume {
   .media-input-feedback-island__content {
+    width: min(80%, 14rem);
+  }
+
+  .media-input-feedback-island__progress {
     --media-progress-fill: var(--media-volume-fill);
+    width: 100%;
+    height: 0.1875rem;
     background-image: linear-gradient(
       to right,
       currentColor 0%,
       currentColor var(--media-progress-fill),
-      transparent var(--media-progress-fill),
-      transparent 100%
+      oklch(from currentColor l c h / 0.2) var(--media-progress-fill),
+      oklch(from currentColor l c h / 0.2) 100%
     );
-    border-radius: inherit;
-    transition: --media-progress-fill 200ms linear;
+    border-radius: calc(Infinity * 1px);
+    box-shadow: 0 1px 0 var(--media-current-shadow-color-subtle);
   }
 
   &[data-level="high"] .media-icon--volume-high,
@@ -1490,14 +1516,14 @@ media-container {
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    &[data-min],
-    &[data-max] {
+    &[data-min] .media-input-feedback-island__content,
+    &[data-max] .media-input-feedback-island__content {
       animation: media-shake 300ms ease-in-out;
     }
   }
 }
 
-.media-default-skin .media-input-feedback-island--status {
+.media-minimal-skin .media-input-feedback-island--status {
   &[data-status="captions-on"] .media-icon--captions-on,
   &[data-status="captions-off"] .media-icon--captions-off,
   &[data-status="fullscreen"] .media-icon--fullscreen-enter,
@@ -1510,7 +1536,7 @@ media-container {
 
 /* --- Bubble ---------------------------------------------------------------- */
 
-.media-default-skin .media-input-feedback-bubble {
+.media-minimal-skin .media-input-feedback-bubble {
   display: grid;
   grid-row: 1;
   grid-column: 2;
@@ -1520,9 +1546,6 @@ media-container {
 
   /* Central bubble (play, pause) */
   &:not([data-direction]) {
-    background: oklch(0 0 0 / 0.35);
-    border-radius: 100%;
-    backdrop-filter: blur(8px);
     transition-timing-function: ease-out;
     transition-duration: 200ms;
     transition-property: opacity, scale;
@@ -1566,12 +1589,13 @@ media-container {
   /* Icons */
   .media-icon {
     display: none;
+    width: calc(var(--media-icon-size) * 2);
+    height: calc(var(--media-icon-size) * 2);
+  }
+
+  .media-icon--seek {
     width: calc(var(--media-icon-size) * 1.5);
     height: calc(var(--media-icon-size) * 1.5);
-
-    &.media-icon--play {
-      translate: 1px 0;
-    }
   }
 
   &[data-direction] .media-icon--seek,
@@ -1723,43 +1747,34 @@ media-container {
    Root
    ========================================================================== */
 
-.media-default-skin--video {
-  --media-spring-timing-function: linear(
-    0,
-    0.034 1.5%,
-    0.763 9.7%,
-    1.066 13.9%,
-    1.198 19.9%,
-    1.184 21.8%,
-    0.963 37.5%,
-    0.997 50.9%,
-    1
-  );
-  --media-border-color: oklch(0 0 0 / 0.1);
-  --media-surface-background-color: oklch(1 0 0 / 0.1);
-  --media-surface-inner-border-color: oklch(1 0 0 / 0.05);
-  --media-surface-outer-border-color: oklch(0 0 0 / 0.1);
-  --media-surface-shadow-color: oklch(0 0 0 / 0.15);
-  --media-surface-backdrop-filter: blur(16px) saturate(1.5);
-  --media-video-border-radius: var(--media-border-radius, 2rem);
+.media-minimal-skin--video {
+  --media-border-color: oklch(0 0 0 / 0.15);
+  --media-video-border-radius: var(--media-border-radius, 0.75rem);
+  --media-controls-background-color: transparent;
   --media-controls-transition-duration: 100ms;
   --media-controls-transition-timing-function: ease-out;
-  --media-error-dialog-transition-duration: 350ms;
+  --media-error-dialog-transition-duration: 150ms;
   --media-error-dialog-transition-delay: 100ms;
-  --media-error-dialog-transition-timing-function: var(--media-spring-timing-function);
+  --media-error-dialog-transition-timing-function: ease-out;
   --media-popup-transition-duration: 100ms;
   --media-popup-transition-timing-function: ease-out;
-  --media-tooltip-side-offset: 0.75rem;
+  --media-tooltip-background-color: oklch(0 0 0 / 0.5);
+  --media-tooltip-border-color: oklch(1 0 0 / 0.1);
+  --media-tooltip-backdrop-filter: blur(16px) saturate(1.5);
+  --media-tooltip-text-color: currentColor;
+  --media-tooltip-side-offset: 0.5rem;
   --media-tooltip-boundary-offset: 0.5rem;
-  --media-popover-side-offset: 0.5rem;
-  --media-popover-boundary-offset: 0.5rem;
+  --media-popover-background-color: var(--media-tooltip-background-color);
+  --media-popover-border-color: var(--media-tooltip-border-color);
+  --media-popover-backdrop-filter: var(--media-tooltip-backdrop-filter);
+  --media-popover-side-offset: 1.5rem;
+  --media-popover-boundary-offset: var(--media-tooltip-boundary-offset);
   overflow: clip;
   background: oklch(0 0 0);
 
   @media (prefers-reduced-motion: reduce) {
     --media-error-dialog-transition-duration: 50ms;
     --media-error-dialog-transition-delay: 0ms;
-    --media-error-dialog-transition-timing-function: ease-out;
     --media-popup-transition-duration: 0ms;
   }
 
@@ -1768,9 +1783,14 @@ media-container {
   }
 
   @media (prefers-reduced-transparency: reduce) or (prefers-contrast: more) {
-    --media-surface-background-color: oklch(0 0 0);
-    --media-surface-inner-border-color: oklch(1 0 0 / 0.25);
-    --media-surface-outer-border-color: transparent;
+    --media-controls-background-color: oklch(0 0 0);
+    --media-tooltip-background-color: oklch(0 0 0);
+  }
+
+  @container media-root (width > 42rem) {
+    & > * {
+      --media-popover-side-offset: 0.5rem;
+    }
   }
 
   &:has(.media-controls:not([data-visible])) {
@@ -1797,6 +1817,7 @@ media-container {
     box-shadow: inset 0 0 0 1px var(--media-border-color);
   }
 
+  /* Fullscreen */
   &:fullscreen {
     --media-border-radius: 0;
   }
@@ -1806,87 +1827,93 @@ media-container {
    Error Dialog
    ========================================================================== */
 
-.media-default-skin--video .media-error {
+.media-minimal-skin--video .media-error {
   position: absolute;
   inset: 0;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
+  outline: none;
 }
 
-.media-default-skin--video .media-error__dialog {
+.media-minimal-skin--video .media-error__dialog {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-width: 18rem;
-  padding: 0.75rem;
+  max-width: 16rem;
+  padding: 1rem;
   color: oklch(1 0 0);
-  text-shadow: 0 1px 0 oklch(0 0 0 / 0.25);
-  border-radius: 1.75rem;
+  text-shadow: 0 1px 0 oklch(0 0 0 / 0.5);
+  pointer-events: auto;
   transition-delay: var(--media-error-dialog-transition-delay);
   transition-timing-function: var(--media-error-dialog-transition-timing-function);
   transition-duration: var(--media-error-dialog-transition-duration);
   transition-property: opacity, scale;
 }
 
-.media-default-skin--video .media-error[data-starting-style] .media-error__dialog,
-.media-default-skin--video .media-error[data-ending-style] .media-error__dialog {
+.media-minimal-skin--video .media-error[data-starting-style] .media-error__dialog,
+.media-minimal-skin--video .media-error[data-ending-style] .media-error__dialog {
   opacity: 0;
   scale: 0.5;
 }
-.media-default-skin--video .media-error[data-ending-style] .media-error__dialog {
+.media-minimal-skin--video .media-error[data-ending-style] .media-error__dialog {
   transition-delay: 0ms;
 }
 
-.media-default-skin--video .media-error__content {
+.media-minimal-skin--video .media-error__content {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.5rem 0.5rem 0.375rem;
-  text-shadow: inherit;
+  padding: 0.375rem 0;
 }
 
-.media-default-skin--video .media-error__title {
-  font-size: 1rem;
+.media-minimal-skin--video .media-error__title {
+  font-size: 1.125rem;
+}
+
+.media-minimal-skin--video .media-error[data-open] ~ .media-controls {
+  display: none;
 }
 
 /* ==========================================================================
-   Controls (hide/show behavior)
-   ========================================================================== */
+  Controls (hide/show behavior)
+  ========================================================================== */
 
-.media-default-skin--video .media-controls {
+.media-minimal-skin--video .media-controls {
   position: absolute;
-  inset-inline: 0.5rem;
-  bottom: 0.5rem;
+  inset-inline: 0.25rem;
+  bottom: 0.25rem;
   z-index: 10;
   flex-wrap: wrap;
-  color: var(--media-color-primary, oklch(1 0 0));
-  transform-origin: bottom;
+  column-gap: 0.5rem;
+  padding: 0.25rem;
+  color: oklch(1 0 0);
+  border-radius: 0.75rem;
   transition-timing-function: var(--media-controls-transition-timing-function);
   transition-duration: var(--media-controls-transition-duration);
 
   @media (pointer: fine) {
-    transition-property: scale, filter, opacity;
-    will-change: scale, filter, opacity;
+    transition-property: translate, filter, opacity;
+    will-change: translate, filter, opacity;
   }
 
   @media (pointer: coarse) {
-    transition-property: scale, opacity;
-    will-change: scale, opacity;
+    transition-property: translate, opacity;
+    will-change: translate, opacity;
   }
 
   &:not([data-visible]) {
     pointer-events: none;
     opacity: 0;
-    scale: 0.95;
 
     @media (pointer: fine) and (prefers-reduced-motion: no-preference) {
       filter: blur(8px);
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      scale: 1;
+    @media (prefers-reduced-motion: no-preference) {
+      translate: 0 100%;
     }
   }
 
@@ -1907,11 +1934,9 @@ media-container {
   }
 
   @container media-root (width > 42rem) {
-    inset-inline: 0.75rem;
-    bottom: 0.75rem;
+    inset-inline: 0.5rem;
+    bottom: 0.5rem;
     flex-wrap: nowrap;
-    column-gap: 0.125rem;
-    padding: 0.25rem;
 
     & .media-time-controls {
       flex: 1;
@@ -1925,12 +1950,8 @@ media-container {
   }
 }
 
-.media-default-skin--video .media-error[data-open] ~ .media-controls {
-  display: none;
-}
-
 /* Hide cursor when controls are hidden */
-.media-default-skin--video:has(.media-controls:not([data-visible])) {
+.media-minimal-skin--video:has(.media-controls:not([data-visible])) {
   cursor: none;
 }
 
@@ -1938,30 +1959,48 @@ media-container {
    Sliders
    ========================================================================== */
 
-.media-default-skin--video .media-slider__track {
-  background-color: oklch(1 0 0 / 0.2);
+.media-minimal-skin--video .media-slider__track {
   box-shadow: 0 0 0 1px oklch(0 0 0 / 0.05);
 }
 
-.media-default-skin--video .media-slider__thumbnail {
+/* ==========================================================================
+   Popups & Animations
+   ========================================================================== */
+
+.media-minimal-skin--video .media-popover--volume {
+  padding-block: 0.75rem;
+  background: transparent;
+  border-radius: 0.75rem;
+
+  @media (prefers-reduced-transparency: reduce) or (prefers-contrast: more) {
+    background: var(--media-controls-background-color);
+  }
+
+  @container media-root (width > 42rem) {
+    & > * {
+      --media-popover-side-offset: 0rem;
+    }
+  }
+}
+
+/* ==========================================================================
+   Slider preview
+   ========================================================================== */
+
+.media-minimal-skin--video .media-slider__thumbnail {
   --media-slider-thumbnail-max-width: 11rem;
   --media-slider-thumbnail-max-height: 8rem;
-  --media-slider-thumbnail-padding: -1.125rem;
+  --media-slider-thumbnail-padding: -0.5rem;
   /**
     Inset is the difference between the container width and the slider (100%) width.
-    Divided by 2 as we render the time on both sides.
+    We only add to the end as we render the time there.
   */
-  --media-slider-thumbnail-inset: calc((100cqi - 100%) / 2);
+  --media-slider-thumbnail-inset: calc(100cqi - 100%);
 
   position: absolute;
-  bottom: calc(100% + 1.2rem);
+  bottom: 100%;
   left: clamp(
-    calc(
-      var(--media-slider-thumbnail-max-width) /
-      2 +
-      var(--media-slider-thumbnail-padding) -
-      var(--media-slider-thumbnail-inset)
-    ),
+    calc(var(--media-slider-thumbnail-max-width) / 2 + var(--media-slider-thumbnail-padding)),
     var(--media-slider-pointer),
     calc(
       100% -
@@ -1971,7 +2010,6 @@ media-container {
       var(--media-slider-thumbnail-inset)
     )
   );
-  pointer-events: none;
   opacity: 0;
   filter: blur(8px);
   transform-origin: bottom;
@@ -1981,17 +2019,36 @@ media-container {
   transition-duration: 150ms;
   transition-property: scale, opacity, filter;
 
+  @container media-root (width > 42rem) {
+    left: var(--media-slider-pointer);
+  }
+
+  & .media-thumbnail__image-wrapper {
+    position: relative;
+
+    &::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      border-radius: inherit;
+      box-shadow:
+        0 0 0 1px oklch(0 0 0 / 0.05),
+        0 1px 3px 0 oklch(0 0 0 / 0.2),
+        0 1px 2px -1px oklch(0 0 0 / 0.2);
+    }
+  }
+
   & .media-thumbnail__image {
     max-width: var(--media-slider-thumbnail-max-width);
     max-height: var(--media-slider-thumbnail-max-height);
   }
 }
-.media-default-skin--video .media-slider[data-pointing] .media-slider__thumbnail:has([role="img"]:not([data-hidden])) {
+.media-minimal-skin--video .media-slider[data-pointing] .media-slider__thumbnail:has([role="img"]:not([data-hidden])) {
   opacity: 1;
   filter: blur(0);
   scale: 1;
 }
-.media-default-skin--video
+.media-minimal-skin--video
   .media-slider__thumbnail:has([role="img"]:not([data-hidden]))
   + .media-slider__preview
   .media-slider__value {
@@ -2003,342 +2060,349 @@ media-container {
 
     <div class="loading" id="loader"><div class="spinner"></div></div>
 
-    <div class="player-wrapper">
-        <div class="file-info">{{ file_name }}</div>
+    <div class="container">
+        <div class="file-info">
+            <div class="file-name-marquee">{{ file_name }}</div>
+        </div>
 
-        <video-player>
-            <media-container class="media-minimal-skin media-minimal-skin--video">
-                <video playsinline preload="auto"></video>
+        <div class="player-wrapper">
+            <!-- Modern video-player custom element -->
+            <video-player>
+                <media-container class="media-minimal-skin media-minimal-skin--video">
+                    <!-- Video element (source will be set by JS) -->
+                    <video playsinline preload="auto"></video>
 
-                <media-buffering-indicator class="media-buffering-indicator">
-                    <media-icon name="spinner" family="minimal" class="media-icon"></media-icon>
-                </media-buffering-indicator>
+                    <!-- Buffering indicator -->
+                    <media-buffering-indicator class="media-buffering-indicator">
+                        <media-icon name="spinner" family="minimal" class="media-icon"></media-icon>
+                    </media-buffering-indicator>
 
-                <media-error-dialog class="media-error">
-                    <div class="media-error__dialog">
-                        <div class="media-error__content">
-                            <media-alert-dialog-title class="media-error__title">Something went wrong.</media-alert-dialog-title>
-                            <media-alert-dialog-description class="media-error__description"></media-alert-dialog-description>
+                    <!-- Error dialog -->
+                    <media-error-dialog class="media-error">
+                        <div class="media-error__dialog">
+                            <div class="media-error__content">
+                                <media-alert-dialog-title class="media-error__title">Something went wrong.</media-alert-dialog-title>
+                                <media-alert-dialog-description class="media-error__description"></media-alert-dialog-description>
+                            </div>
+                            <div class="media-error__actions">
+                                <media-alert-dialog-close class="media-button media-button--primary">OK</media-alert-dialog-close>
+                            </div>
                         </div>
-                        <div class="media-error__actions">
-                            <media-alert-dialog-close class="media-button media-button--primary">OK</media-alert-dialog-close>
-                        </div>
-                    </div>
-                </media-error-dialog>
+                    </media-error-dialog>
 
-                <media-controls class="media-controls">
-                    <media-tooltip-group>
-                        <div class="media-button-group">
-                            <media-play-button commandfor="play-tooltip" class="media-button media-button--subtle media-button--icon media-button--play">
-                                <media-icon name="restart" family="minimal" class="media-icon media-icon--restart"></media-icon>
-                                <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
-                                <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
-                            </media-play-button>
-                            <media-tooltip id="play-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
+                    <!-- Controls -->
+                    <media-controls class="media-controls">
+                        <media-tooltip-group>
+                            <div class="media-button-group">
+                                <media-play-button commandfor="play-tooltip" class="media-button media-button--subtle media-button--icon media-button--play">
+                                    <media-icon name="restart" family="minimal" class="media-icon media-icon--restart"></media-icon>
+                                    <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
+                                    <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
+                                </media-play-button>
+                                <media-tooltip id="play-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
 
-                            <media-seek-button commandfor="seek-backward-tooltip" seconds="-10" class="media-button media-button--subtle media-button--icon media-button--seek">
-                                <span class="media-icon__container">
-                                    <media-icon name="seek" family="minimal" class="media-icon media-icon--flipped"></media-icon>
-                                    <span class="media-icon__label">10</span>
-                                </span>
-                            </media-seek-button>
-                            <media-tooltip id="seek-backward-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
+                                <media-seek-button commandfor="seek-backward-tooltip" seconds="-10" class="media-button media-button--subtle media-button--icon media-button--seek">
+                                    <span class="media-icon__container">
+                                        <media-icon name="seek" family="minimal" class="media-icon media-icon--flipped"></media-icon>
+                                        <span class="media-icon__label">10</span>
+                                    </span>
+                                </media-seek-button>
+                                <media-tooltip id="seek-backward-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
 
-                            <media-seek-button commandfor="seek-forward-tooltip" seconds="10" class="media-button media-button--subtle media-button--icon media-button--seek">
-                                <span class="media-icon__container">
-                                    <media-icon name="seek" family="minimal" class="media-icon"></media-icon>
-                                    <span class="media-icon__label">10</span>
-                                </span>
-                            </media-seek-button>
-                            <media-tooltip id="seek-forward-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
-                        </div>
+                                <media-seek-button commandfor="seek-forward-tooltip" seconds="10" class="media-button media-button--subtle media-button--icon media-button--seek">
+                                    <span class="media-icon__container">
+                                        <media-icon name="seek" family="minimal" class="media-icon"></media-icon>
+                                        <span class="media-icon__label">10</span>
+                                    </span>
+                                </media-seek-button>
+                                <media-tooltip id="seek-forward-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
+                            </div>
 
-                        <div class="media-time-controls">
-                            <media-time-group class="media-time-group">
-                                <media-time toggle type="current" class="media-time media-time--current"></media-time>
-                                <media-time-separator class="media-time-separator"></media-time-separator>
-                                <media-time type="duration" class="media-time media-time--duration"></media-time>
-                            </media-time-group>
+                            <div class="media-time-controls">
+                                <media-time-group class="media-time-group">
+                                    <media-time toggle type="current" class="media-time media-time--current"></media-time>
+                                    <media-time-separator class="media-time-separator"></media-time-separator>
+                                    <media-time type="duration" class="media-time media-time--duration"></media-time>
+                                </media-time-group>
 
-                            <media-time-slider class="media-slider">
-                                <media-slider-track class="media-slider__track">
-                                    <media-slider-fill class="media-slider__fill"></media-slider-fill>
-                                    <media-slider-buffer class="media-slider__buffer"></media-slider-buffer>
-                                </media-slider-track>
-                                <media-slider-thumb class="media-slider__thumb"></media-slider-thumb>
-
-                                <div class="media-thumbnail media-slider__thumbnail">
-                                    <div class="media-thumbnail__image-wrapper">
-                                        <media-slider-thumbnail class="media-thumbnail__image"></media-slider-thumbnail>
-                                    </div>
-                                    <media-slider-value type="pointer" class="media-time media-thumbnail__time"></media-slider-value>
-                                    <media-icon name="spinner" family="minimal" class="media-thumbnail__spinner media-icon"></media-icon>
-                                </div>
-
-                                <media-slider-preview class="media-slider__preview">
-                                    <media-slider-value type="pointer" class="media-slider__value media-time"></media-slider-value>
-                                </media-slider-preview>
-                            </media-time-slider>
-                        </div>
-
-                        <div class="media-button-group">
-                            <media-mute-button commandfor="video-volume-popover" class="media-button media-button--subtle media-button--icon media-button--mute">
-                                <media-icon name="volume-off" family="minimal" class="media-icon media-icon--volume-off"></media-icon>
-                                <media-icon name="volume-low" family="minimal" class="media-icon media-icon--volume-low"></media-icon>
-                                <media-icon name="volume-high" family="minimal" class="media-icon media-icon--volume-high"></media-icon>
-                            </media-mute-button>
-
-                            <media-popover id="video-volume-popover" open-on-hover delay="200" close-delay="100" side="top" class="media-popover media-popover--volume">
-                                <media-volume-slider class="media-slider" orientation="vertical" thumb-alignment="edge">
+                                <media-time-slider class="media-slider">
                                     <media-slider-track class="media-slider__track">
                                         <media-slider-fill class="media-slider__fill"></media-slider-fill>
+                                        <media-slider-buffer class="media-slider__buffer"></media-slider-buffer>
                                     </media-slider-track>
-                                    <media-slider-thumb class="media-slider__thumb media-slider__thumb--persistent"></media-slider-thumb>
-                                </media-volume-slider>
-                            </media-popover>
+                                    <media-slider-thumb class="media-slider__thumb"></media-slider-thumb>
 
-                            <button commandfor="settings-menu" aria-label="Settings" class="media-button media-button--subtle media-button--icon media-button--settings">
-                                <media-icon name="gear" family="minimal" class="media-icon media-icon--settings"></media-icon>
-                            </button>
-                            <media-menu id="settings-menu" side="top" align="center" class="media-popover media-menu media-menu--settings">
-                                <!-- (full settings menu – same as earlier) -->
-                                <media-menu-view class="media-menu__panel">
-                                    <div class="media-menu__group">
-                                        <media-menu-item commandfor="settings-quality-menu" type="quality" data-setting="quality" class="media-menu__item media-menu__item--submenu">
-                                            <media-icon name="switches" family="minimal" class="media-icon"></media-icon>
-                                            <span>Quality</span>
-                                            <span class="media-menu__hint">
-                                                <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
-                                                <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
-                                            </span>
-                                        </media-menu-item>
-                                        <media-menu-item commandfor="settings-audio-menu" type="audio-track" data-setting="audio-track" class="media-menu__item media-menu__item--submenu">
-                                            <media-icon name="speech" family="minimal" class="media-icon"></media-icon>
-                                            <span>Audio</span>
-                                            <span class="media-menu__hint">
-                                                <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
-                                                <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
-                                            </span>
-                                        </media-menu-item>
-                                        <media-menu-item commandfor="settings-speed-menu" type="playback-rate" data-setting="playback-rate" class="media-menu__item media-menu__item--submenu">
-                                            <media-icon name="speed" family="minimal" class="media-icon"></media-icon>
-                                            <span>Speed</span>
-                                            <span class="media-menu__hint">
-                                                <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
-                                                <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
-                                            </span>
-                                        </media-menu-item>
-                                        <media-menu-item commandfor="settings-captions-menu" type="captions" data-setting="captions" class="media-menu__item media-menu__item--submenu">
-                                            <media-icon name="captions-off" family="minimal" class="media-icon"></media-icon>
-                                            <span>Captions</span>
-                                            <span class="media-menu__hint">
-                                                <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
-                                                <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
-                                            </span>
-                                        </media-menu-item>
+                                    <div class="media-thumbnail media-slider__thumbnail">
+                                        <div class="media-thumbnail__image-wrapper">
+                                            <media-slider-thumbnail class="media-thumbnail__image"></media-slider-thumbnail>
+                                        </div>
+                                        <media-slider-value type="pointer" class="media-time media-thumbnail__time"></media-slider-value>
+                                        <media-icon name="spinner" family="minimal" class="media-thumbnail__spinner media-icon"></media-icon>
                                     </div>
-                                </media-menu-view>
 
-                                <!-- submenus ... (abbreviated for brevity; use the full ones from previous answer) -->
-                                <media-menu id="settings-quality-menu" class="media-menu__panel">
-                                    <media-menu-back class="media-menu__back">
-                                        <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
-                                        Quality
-                                    </media-menu-back>
-                                    <div class="media-menu__separator"></div>
-                                    <media-quality-radio-group class="media-menu__group">
-                                        <template>
-                                            <media-menu-radio-item class="media-menu__item">
-                                                <span>
-                                                    <span data-part="label"></span>
-                                                    <sup data-part="tier" class="media-menu__tier"></sup>
+                                    <media-slider-preview class="media-slider__preview">
+                                        <media-slider-value type="pointer" class="media-slider__value media-time"></media-slider-value>
+                                    </media-slider-preview>
+                                </media-time-slider>
+                            </div>
+
+                            <div class="media-button-group">
+                                <media-mute-button commandfor="video-volume-popover" class="media-button media-button--subtle media-button--icon media-button--mute">
+                                    <media-icon name="volume-off" family="minimal" class="media-icon media-icon--volume-off"></media-icon>
+                                    <media-icon name="volume-low" family="minimal" class="media-icon media-icon--volume-low"></media-icon>
+                                    <media-icon name="volume-high" family="minimal" class="media-icon media-icon--volume-high"></media-icon>
+                                </media-mute-button>
+
+                                <media-popover id="video-volume-popover" open-on-hover delay="200" close-delay="100" side="top" class="media-popover media-popover--volume">
+                                    <media-volume-slider class="media-slider" orientation="vertical" thumb-alignment="edge">
+                                        <media-slider-track class="media-slider__track">
+                                            <media-slider-fill class="media-slider__fill"></media-slider-fill>
+                                        </media-slider-track>
+                                        <media-slider-thumb class="media-slider__thumb media-slider__thumb--persistent"></media-slider-thumb>
+                                    </media-volume-slider>
+                                </media-popover>
+
+                                <button commandfor="settings-menu" aria-label="Settings" class="media-button media-button--subtle media-button--icon media-button--settings">
+                                    <media-icon name="gear" family="minimal" class="media-icon media-icon--settings"></media-icon>
+                                </button>
+                                <media-menu id="settings-menu" side="top" align="center" class="media-popover media-menu media-menu--settings">
+                                    <media-menu-view class="media-menu__panel">
+                                        <div class="media-menu__group">
+                                            <media-menu-item commandfor="settings-quality-menu" type="quality" data-setting="quality" class="media-menu__item media-menu__item--submenu">
+                                                <media-icon name="switches" family="minimal" class="media-icon"></media-icon>
+                                                <span>Quality</span>
+                                                <span class="media-menu__hint">
+                                                    <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
+                                                    <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
                                                 </span>
-                                                <span data-part="badge" class="media-badge"></span>
-                                                <media-menu-item-indicator force-mount class="media-menu__indicator">
-                                                    <media-icon name="check" family="minimal" class="media-icon"></media-icon>
-                                                </media-menu-item-indicator>
-                                            </media-menu-radio-item>
-                                        </template>
-                                    </media-quality-radio-group>
+                                            </media-menu-item>
+                                            <media-menu-item commandfor="settings-audio-menu" type="audio-track" data-setting="audio-track" class="media-menu__item media-menu__item--submenu">
+                                                <media-icon name="speech" family="minimal" class="media-icon"></media-icon>
+                                                <span>Audio</span>
+                                                <span class="media-menu__hint">
+                                                    <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
+                                                    <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
+                                                </span>
+                                            </media-menu-item>
+                                            <media-menu-item commandfor="settings-speed-menu" type="playback-rate" data-setting="playback-rate" class="media-menu__item media-menu__item--submenu">
+                                                <media-icon name="speed" family="minimal" class="media-icon"></media-icon>
+                                                <span>Speed</span>
+                                                <span class="media-menu__hint">
+                                                    <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
+                                                    <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
+                                                </span>
+                                            </media-menu-item>
+                                            <media-menu-item commandfor="settings-captions-menu" type="captions" data-setting="captions" class="media-menu__item media-menu__item--submenu">
+                                                <media-icon name="captions-off" family="minimal" class="media-icon"></media-icon>
+                                                <span>Captions</span>
+                                                <span class="media-menu__hint">
+                                                    <media-menu-item-value class="media-menu__hint-label"></media-menu-item-value>
+                                                    <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron"></media-icon>
+                                                </span>
+                                            </media-menu-item>
+                                        </div>
+                                    </media-menu-view>
+
+                                    <media-menu id="settings-quality-menu" class="media-menu__panel">
+                                        <media-menu-back class="media-menu__back">
+                                            <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
+                                            Quality
+                                        </media-menu-back>
+                                        <div class="media-menu__separator"></div>
+                                        <media-quality-radio-group class="media-menu__group">
+                                            <template>
+                                                <media-menu-radio-item class="media-menu__item">
+                                                    <span>
+                                                        <span data-part="label"></span>
+                                                        <sup data-part="tier" class="media-menu__tier"></sup>
+                                                    </span>
+                                                    <span data-part="badge" class="media-badge"></span>
+                                                    <media-menu-item-indicator force-mount class="media-menu__indicator">
+                                                        <media-icon name="check" family="minimal" class="media-icon"></media-icon>
+                                                    </media-menu-item-indicator>
+                                                </media-menu-radio-item>
+                                            </template>
+                                        </media-quality-radio-group>
+                                    </media-menu>
+
+                                    <media-menu id="settings-audio-menu" class="media-menu__panel">
+                                        <media-menu-back class="media-menu__back">
+                                            <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
+                                            Audio
+                                        </media-menu-back>
+                                        <div class="media-menu__separator"></div>
+                                        <media-audio-track-radio-group class="media-menu__group">
+                                            <template>
+                                                <media-menu-radio-item class="media-menu__item">
+                                                    <span data-part="label"></span>
+                                                    <media-menu-item-indicator force-mount class="media-menu__indicator">
+                                                        <media-icon name="check" family="minimal" class="media-icon"></media-icon>
+                                                    </media-menu-item-indicator>
+                                                </media-menu-radio-item>
+                                            </template>
+                                        </media-audio-track-radio-group>
+                                    </media-menu>
+
+                                    <media-menu id="settings-speed-menu" class="media-menu__panel">
+                                        <media-menu-back class="media-menu__back">
+                                            <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
+                                            Speed
+                                        </media-menu-back>
+                                        <div class="media-menu__separator"></div>
+                                        <media-playback-rate-radio-group class="media-menu__group">
+                                            <template>
+                                                <media-menu-radio-item class="media-menu__item">
+                                                    <span data-part="label"></span>
+                                                    <media-menu-item-indicator force-mount class="media-menu__indicator">
+                                                        <media-icon name="check" family="minimal" class="media-icon"></media-icon>
+                                                    </media-menu-item-indicator>
+                                                </media-menu-radio-item>
+                                            </template>
+                                        </media-playback-rate-radio-group>
+                                    </media-menu>
+
+                                    <media-menu id="settings-captions-menu" class="media-menu__panel">
+                                        <media-menu-back class="media-menu__back">
+                                            <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
+                                            Captions
+                                        </media-menu-back>
+                                        <div class="media-menu__separator"></div>
+                                        <media-captions-radio-group class="media-menu__group">
+                                            <template>
+                                                <media-menu-radio-item class="media-menu__item">
+                                                    <span data-part="label"></span>
+                                                    <media-menu-item-indicator force-mount class="media-menu__indicator">
+                                                        <media-icon name="check" family="minimal" class="media-icon"></media-icon>
+                                                    </media-menu-item-indicator>
+                                                </media-menu-radio-item>
+                                            </template>
+                                        </media-captions-radio-group>
+                                    </media-menu>
                                 </media-menu>
 
-                                <media-menu id="settings-audio-menu" class="media-menu__panel">
-                                    <media-menu-back class="media-menu__back">
-                                        <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
-                                        Audio
-                                    </media-menu-back>
-                                    <div class="media-menu__separator"></div>
-                                    <media-audio-track-radio-group class="media-menu__group">
-                                        <template>
-                                            <media-menu-radio-item class="media-menu__item">
-                                                <span data-part="label"></span>
-                                                <media-menu-item-indicator force-mount class="media-menu__indicator">
-                                                    <media-icon name="check" family="minimal" class="media-icon"></media-icon>
-                                                </media-menu-item-indicator>
-                                            </media-menu-radio-item>
-                                        </template>
-                                    </media-audio-track-radio-group>
-                                </media-menu>
+                                <media-cast-button commandfor="cast-tooltip" class="media-button media-button--subtle media-button--icon media-button--cast">
+                                    <media-icon name="cast-enter" family="minimal" class="media-icon media-icon--cast-enter"></media-icon>
+                                    <media-icon name="cast-exit" family="minimal" class="media-icon media-icon--cast-exit"></media-icon>
+                                </media-cast-button>
+                                <media-tooltip id="cast-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
 
-                                <media-menu id="settings-speed-menu" class="media-menu__panel">
-                                    <media-menu-back class="media-menu__back">
-                                        <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
-                                        Speed
-                                    </media-menu-back>
-                                    <div class="media-menu__separator"></div>
-                                    <media-playback-rate-radio-group class="media-menu__group">
-                                        <template>
-                                            <media-menu-radio-item class="media-menu__item">
-                                                <span data-part="label"></span>
-                                                <media-menu-item-indicator force-mount class="media-menu__indicator">
-                                                    <media-icon name="check" family="minimal" class="media-icon"></media-icon>
-                                                </media-menu-item-indicator>
-                                            </media-menu-radio-item>
-                                        </template>
-                                    </media-playback-rate-radio-group>
-                                </media-menu>
+                                <media-airplay-button commandfor="airplay-tooltip" class="media-button media-button--subtle media-button--icon media-button--airplay">
+                                    <media-icon name="airplay-enter" family="minimal" class="media-icon media-icon--airplay-enter"></media-icon>
+                                    <media-icon name="airplay-exit" family="minimal" class="media-icon media-icon--airplay-exit"></media-icon>
+                                </media-airplay-button>
+                                <media-tooltip id="airplay-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
 
-                                <media-menu id="settings-captions-menu" class="media-menu__panel">
-                                    <media-menu-back class="media-menu__back">
-                                        <media-icon name="chevron" family="minimal" class="media-icon media-menu__chevron media-icon--flipped"></media-icon>
-                                        Captions
-                                    </media-menu-back>
-                                    <div class="media-menu__separator"></div>
-                                    <media-captions-radio-group class="media-menu__group">
-                                        <template>
-                                            <media-menu-radio-item class="media-menu__item">
-                                                <span data-part="label"></span>
-                                                <media-menu-item-indicator force-mount class="media-menu__indicator">
-                                                    <media-icon name="check" family="minimal" class="media-icon"></media-icon>
-                                                </media-menu-item-indicator>
-                                            </media-menu-radio-item>
-                                        </template>
-                                    </media-captions-radio-group>
-                                </media-menu>
-                            </media-menu>
+                                <media-pip-button commandfor="pip-tooltip" class="media-button media-button--subtle media-button--icon media-button--pip">
+                                    <media-icon name="pip-enter" family="minimal" class="media-icon media-icon--pip-enter"></media-icon>
+                                    <media-icon name="pip-exit" family="minimal" class="media-icon media-icon--pip-exit"></media-icon>
+                                </media-pip-button>
+                                <media-tooltip id="pip-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
 
-                            <media-cast-button commandfor="cast-tooltip" class="media-button media-button--subtle media-button--icon media-button--cast">
-                                <media-icon name="cast-enter" family="minimal" class="media-icon media-icon--cast-enter"></media-icon>
-                                <media-icon name="cast-exit" family="minimal" class="media-icon media-icon--cast-exit"></media-icon>
-                            </media-cast-button>
-                            <media-tooltip id="cast-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
+                                <media-fullscreen-button commandfor="fullscreen-tooltip" class="media-button media-button--subtle media-button--icon media-button--fullscreen">
+                                    <media-icon name="fullscreen-enter" family="minimal" class="media-icon media-icon--fullscreen-enter"></media-icon>
+                                    <media-icon name="fullscreen-exit" family="minimal" class="media-icon media-icon--fullscreen-exit"></media-icon>
+                                </media-fullscreen-button>
+                                <media-tooltip id="fullscreen-tooltip" side="top" class="media-tooltip">
+                                    <media-tooltip-label></media-tooltip-label>
+                                    <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
+                                </media-tooltip>
+                            </div>
+                        </media-tooltip-group>
+                    </media-controls>
 
-                            <media-airplay-button commandfor="airplay-tooltip" class="media-button media-button--subtle media-button--icon media-button--airplay">
-                                <media-icon name="airplay-enter" family="minimal" class="media-icon media-icon--airplay-enter"></media-icon>
-                                <media-icon name="airplay-exit" family="minimal" class="media-icon media-icon--airplay-exit"></media-icon>
-                            </media-airplay-button>
-                            <media-tooltip id="airplay-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
+                    <div class="media-overlay"></div>
 
-                            <media-pip-button commandfor="pip-tooltip" class="media-button media-button--subtle media-button--icon media-button--pip">
-                                <media-icon name="pip-enter" family="minimal" class="media-icon media-icon--pip-enter"></media-icon>
-                                <media-icon name="pip-exit" family="minimal" class="media-icon media-icon--pip-exit"></media-icon>
-                            </media-pip-button>
-                            <media-tooltip id="pip-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
+                    <!-- Hotkeys -->
+                    <media-hotkey keys="Space" action="togglePaused"></media-hotkey>
+                    <media-hotkey keys="k" action="togglePaused"></media-hotkey>
+                    <media-hotkey keys="m" action="toggleMuted"></media-hotkey>
+                    <media-hotkey keys="f" action="toggleFullscreen"></media-hotkey>
+                    <media-hotkey keys="c" action="toggleSubtitles"></media-hotkey>
+                    <media-hotkey keys="i" action="togglePictureInPicture"></media-hotkey>
+                    <media-hotkey keys="ArrowRight" action="seekStep" value="5"></media-hotkey>
+                    <media-hotkey keys="ArrowLeft" action="seekStep" value="-5"></media-hotkey>
+                    <media-hotkey keys="l" action="seekStep" value="10"></media-hotkey>
+                    <media-hotkey keys="j" action="seekStep" value="-10"></media-hotkey>
+                    <media-hotkey keys="ArrowUp" action="volumeStep" value="0.05"></media-hotkey>
+                    <media-hotkey keys="ArrowDown" action="volumeStep" value="-0.05"></media-hotkey>
+                    <media-hotkey keys="0-9" action="seekToPercent"></media-hotkey>
+                    <media-hotkey keys="Home" action="seekToPercent" value="0"></media-hotkey>
+                    <media-hotkey keys="End" action="seekToPercent" value="100"></media-hotkey>
+                    <media-hotkey keys=">" action="speedUp"></media-hotkey>
+                    <media-hotkey keys="<" action="speedDown"></media-hotkey>
 
-                            <media-fullscreen-button commandfor="fullscreen-tooltip" class="media-button media-button--subtle media-button--icon media-button--fullscreen">
+                    <!-- Gestures -->
+                    <media-gesture type="tap" action="togglePaused" pointer="mouse" region="center"></media-gesture>
+                    <media-gesture type="tap" action="toggleControls" pointer="touch"></media-gesture>
+                    <media-gesture type="doubletap" action="seekStep" value="-10" region="left"></media-gesture>
+                    <media-gesture type="doubletap" action="toggleFullscreen" region="center"></media-gesture>
+                    <media-gesture type="doubletap" action="seekStep" value="10" region="right"></media-gesture>
+
+                    <!-- Input Feedback -->
+                    <media-status-announcer></media-status-announcer>
+                    <div class="media-input-feedback">
+                        <media-volume-indicator hidden class="media-input-feedback-island media-input-feedback-island--volume">
+                            <media-volume-indicator-fill class="media-input-feedback-island__content">
+                                <media-icon name="volume-high" family="minimal" class="media-icon media-icon--volume-high"></media-icon>
+                                <media-icon name="volume-low" family="minimal" class="media-icon media-icon--volume-low"></media-icon>
+                                <media-icon name="volume-off" family="minimal" class="media-icon media-icon--volume-off"></media-icon>
+                                <div class="media-input-feedback-island__progress" aria-hidden="true"></div>
+                                <media-volume-indicator-value class="media-input-feedback-island__value"></media-volume-indicator-value>
+                            </media-volume-indicator-fill>
+                        </media-volume-indicator>
+
+                        <media-status-indicator hidden actions="toggleSubtitles toggleFullscreen togglePictureInPicture" class="media-input-feedback-island media-input-feedback-island--status">
+                            <div class="media-input-feedback-island__content">
+                                <media-icon name="captions-on" family="minimal" class="media-icon media-icon--captions-on"></media-icon>
+                                <media-icon name="captions-off" family="minimal" class="media-icon media-icon--captions-off"></media-icon>
                                 <media-icon name="fullscreen-enter" family="minimal" class="media-icon media-icon--fullscreen-enter"></media-icon>
                                 <media-icon name="fullscreen-exit" family="minimal" class="media-icon media-icon--fullscreen-exit"></media-icon>
-                            </media-fullscreen-button>
-                            <media-tooltip id="fullscreen-tooltip" side="top" class="media-tooltip">
-                                <media-tooltip-label></media-tooltip-label>
-                                <media-tooltip-shortcut class="media-tooltip__kbd"></media-tooltip-shortcut>
-                            </media-tooltip>
-                        </div>
-                    </media-tooltip-group>
-                </media-controls>
+                                <media-icon name="pip-enter" family="minimal" class="media-icon media-icon--pip-enter"></media-icon>
+                                <media-icon name="pip-exit" family="minimal" class="media-icon media-icon--pip-exit"></media-icon>
+                                <media-status-indicator-value class="media-input-feedback-island__value"></media-status-indicator-value>
+                            </div>
+                        </media-status-indicator>
 
-                <div class="media-overlay"></div>
+                        <media-seek-indicator hidden class="media-input-feedback-bubble">
+                            <media-icon name="chevron" family="minimal" class="media-icon media-icon--seek"></media-icon>
+                            <media-seek-indicator-value class="media-time"></media-seek-indicator-value>
+                        </media-seek-indicator>
 
-                <!-- Hotkeys -->
-                <media-hotkey keys="Space" action="togglePaused"></media-hotkey>
-                <media-hotkey keys="k" action="togglePaused"></media-hotkey>
-                <media-hotkey keys="m" action="toggleMuted"></media-hotkey>
-                <media-hotkey keys="f" action="toggleFullscreen"></media-hotkey>
-                <media-hotkey keys="c" action="toggleSubtitles"></media-hotkey>
-                <media-hotkey keys="i" action="togglePictureInPicture"></media-hotkey>
-                <media-hotkey keys="ArrowRight" action="seekStep" value="5"></media-hotkey>
-                <media-hotkey keys="ArrowLeft" action="seekStep" value="-5"></media-hotkey>
-                <media-hotkey keys="l" action="seekStep" value="10"></media-hotkey>
-                <media-hotkey keys="j" action="seekStep" value="-10"></media-hotkey>
-                <media-hotkey keys="ArrowUp" action="volumeStep" value="0.05"></media-hotkey>
-                <media-hotkey keys="ArrowDown" action="volumeStep" value="-0.05"></media-hotkey>
-                <media-hotkey keys="0-9" action="seekToPercent"></media-hotkey>
-                <media-hotkey keys="Home" action="seekToPercent" value="0"></media-hotkey>
-                <media-hotkey keys="End" action="seekToPercent" value="100"></media-hotkey>
-                <media-hotkey keys=">" action="speedUp"></media-hotkey>
-                <media-hotkey keys="<" action="speedDown"></media-hotkey>
-
-                <!-- Gestures -->
-                <media-gesture type="tap" action="togglePaused" pointer="mouse" region="center"></media-gesture>
-                <media-gesture type="tap" action="toggleControls" pointer="touch"></media-gesture>
-                <media-gesture type="doubletap" action="seekStep" value="-10" region="left"></media-gesture>
-                <media-gesture type="doubletap" action="toggleFullscreen" region="center"></media-gesture>
-                <media-gesture type="doubletap" action="seekStep" value="10" region="right"></media-gesture>
-
-                <!-- Input Feedback -->
-                <media-status-announcer></media-status-announcer>
-                <div class="media-input-feedback">
-                    <media-volume-indicator hidden class="media-input-feedback-island media-input-feedback-island--volume">
-                        <media-volume-indicator-fill class="media-input-feedback-island__content">
-                            <media-icon name="volume-high" family="minimal" class="media-icon media-icon--volume-high"></media-icon>
-                            <media-icon name="volume-low" family="minimal" class="media-icon media-icon--volume-low"></media-icon>
-                            <media-icon name="volume-off" family="minimal" class="media-icon media-icon--volume-off"></media-icon>
-                            <div class="media-input-feedback-island__progress" aria-hidden="true"></div>
-                            <media-volume-indicator-value class="media-input-feedback-island__value"></media-volume-indicator-value>
-                        </media-volume-indicator-fill>
-                    </media-volume-indicator>
-
-                    <media-status-indicator hidden actions="toggleSubtitles toggleFullscreen togglePictureInPicture" class="media-input-feedback-island media-input-feedback-island--status">
-                        <div class="media-input-feedback-island__content">
-                            <media-icon name="captions-on" family="minimal" class="media-icon media-icon--captions-on"></media-icon>
-                            <media-icon name="captions-off" family="minimal" class="media-icon media-icon--captions-off"></media-icon>
-                            <media-icon name="fullscreen-enter" family="minimal" class="media-icon media-icon--fullscreen-enter"></media-icon>
-                            <media-icon name="fullscreen-exit" family="minimal" class="media-icon media-icon--fullscreen-exit"></media-icon>
-                            <media-icon name="pip-enter" family="minimal" class="media-icon media-icon--pip-enter"></media-icon>
-                            <media-icon name="pip-exit" family="minimal" class="media-icon media-icon--pip-exit"></media-icon>
-                            <media-status-indicator-value class="media-input-feedback-island__value"></media-status-indicator-value>
-                        </div>
-                    </media-status-indicator>
-
-                    <media-seek-indicator hidden class="media-input-feedback-bubble">
-                        <media-icon name="chevron" family="minimal" class="media-icon media-icon--seek"></media-icon>
-                        <media-seek-indicator-value class="media-time"></media-seek-indicator-value>
-                    </media-seek-indicator>
-
-                    <media-status-indicator hidden actions="togglePaused" class="media-input-feedback-bubble">
-                        <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
-                        <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
-                    </media-status-indicator>
-                </div>
-            </media-container>
-        </video-player>
+                        <media-status-indicator hidden actions="togglePaused" class="media-input-feedback-bubble">
+                            <media-icon name="play" family="minimal" class="media-icon media-icon--play"></media-icon>
+                            <media-icon name="pause" family="minimal" class="media-icon media-icon--pause"></media-icon>
+                        </media-status-indicator>
+                    </div>
+                </media-container>
+            </video-player>
+        </div>
     </div>
 
-    <!-- HLS support -->
+    <!-- Optional HLS support -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <!-- The custom element module – needs a web server to load -->
+    <!-- Video.js Minimal UI Module -->
     <script type="module" src="https://cdn.jsdelivr.net/npm/@videojs/html/cdn/video-minimal-ui.js"></script>
     
     <script>
-        // Disable context menu and Ctrl+S
+        // Security: prevent context menu and Ctrl+S
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
@@ -2353,16 +2417,18 @@ media-container {
             loader.classList.add('hidden');
         }
 
-        // Wait for the custom element to be registered, then attach the source
+        // Wait for the custom element to be defined, then set up the video source
         customElements.whenDefined('video-player').then(() => {
             const video = document.querySelector('video-player video') || document.querySelector('video');
             if (!video) return;
 
+            // Helper to hide loader when ready
             function onReady() {
                 hideLoader();
             }
 
             if (videoUrl.includes('.m3u8') && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                // HLS stream
                 const hls = new Hls();
                 hls.loadSource(videoUrl);
                 hls.attachMedia(video);
@@ -2385,6 +2451,7 @@ media-container {
                     }
                 });
             } else {
+                // MP4 or other native format
                 video.src = videoUrl;
                 if (video.readyState >= 2) {
                     onReady();
@@ -2394,7 +2461,7 @@ media-container {
             }
         });
 
-        // Fallback loader hide
+        // Fallback: hide loader after 8 seconds if player not ready
         setTimeout(() => {
             if (!loader.classList.contains('hidden')) {
                 hideLoader();
