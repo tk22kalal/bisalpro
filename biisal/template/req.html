@@ -2058,25 +2058,25 @@ media-container {
 }
 
 /* ---------- Central Play/Pause Button (YouTube style) ---------- */
+/* ---------- Central Play/Pause Button (YouTube style, perfectly centred) ---------- */
 .center-play-button {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 15;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;                     /* Smaller circle */
+    width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.45); /* Lighter semi-transparent black */
+    background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(6px);
     color: white;
     cursor: pointer;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
+    display: grid;                 /* Grid ensures perfect centering */
+    place-items: center;           /* Center content both axes */
 }
 
 /* Show button when controls are visible */
@@ -2085,7 +2085,7 @@ media-container {
     pointer-events: auto;
 }
 
-/* Hide ALL icons by default (same pattern as player.css) */
+/* Hide ALL icons by default */
 .center-play-button .media-icon--restart,
 .center-play-button .media-icon--play,
 .center-play-button .media-icon--pause {
@@ -2093,22 +2093,20 @@ media-container {
     opacity: 0;
 }
 
-/* ----- Active icon per state (replicated from .media-button--play rules) ----- */
-/* Ended → restart icon */
+/* State‑driven visibility – only the correct icon appears */
 .center-play-button[data-ended] .media-icon--restart,
-/* Paused or not yet started → play icon */
 .center-play-button:not([data-ended])[data-paused] .media-icon--play,
 .center-play-button:not([data-ended]):not([data-started]) .media-icon--play,
-/* Playing → pause icon */
 .center-play-button[data-started]:not([data-paused]):not([data-ended]) .media-icon--pause {
     display: block;
     opacity: 1;
 }
 
-/* Make the active icon a comfortable size */
+/* All icons sit in the same grid cell, perfectly centred */
 .center-play-button .media-icon {
     width: 36px;
     height: 36px;
+    grid-area: 1 / 1;              /* Overlap in the single grid cell */
 }
     </style>
 </head>
