@@ -4,110 +4,121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
+    
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
+    
     <!-- Video.js CSS -->
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    
     <style>
+        :root {
+            --primary-color: #4f46e5;
+            --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            --glass-bg: rgba(26, 26, 46, 0.95);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            background: var(--bg-gradient);
             font-family: 'Raleway', sans-serif;
+            color: white;
+            min-height: 100vh;
             overflow-x: hidden;
+            /* Prevent text selection but allow interaction with player */
             -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
             user-select: none;
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            min-height: 100vh;
         }
 
+        /* File Info Bar */
         .file-info {
-            background: linear-gradient(90deg, rgba(26,26,46,0.9), rgba(46,46,86,0.9));
-            padding: 15px;
+            background: var(--glass-bg);
+            padding: 15px 20px;
             border-radius: 12px 12px 0 0;
-            margin-bottom: -8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-bottom: none;
             overflow: hidden;
-            z-index: 2;
         }
 
         .file-name-marquee {
             font-family: 'Delius', cursive;
             font-size: 18px;
             font-weight: 600;
-            color: #fff;
             white-space: nowrap;
-            overflow: hidden;
-            animation: marquee 15s linear infinite;
             display: inline-block;
-            padding-left: 100%;
+            animation: marquee 15s linear infinite;
         }
 
         @keyframes marquee {
-            0%   { transform: translateX(0); }
+            0% { transform: translateX(100vw); }
             100% { transform: translateX(-100%); }
         }
 
-        .file-info:hover .file-name-marquee { animation-play-state: paused; }
-
+        /* Player Wrapper */
         .player-wrapper {
             position: relative;
-            border-radius: 0 0 12px 12px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
             background: #000;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
         }
 
-        /* Video.js Custom Styling */
+        /* Video.js Customization */
         .video-js {
             width: 100%;
-            aspect-ratio: 16 / 9;
-            font-family: 'Raleway', sans-serif;
+            aspect-ratio: 16/9;
         }
 
-        /* Hide big middle play button as requested */
+        /* Change Big Play Button to a Circle */
         .vjs-big-play-button {
-            display: none !important;
+            background-color: rgba(79, 70, 229, 0.7) !important;
+            border-radius: 50% !important;
+            width: 80px !important;
+            height: 80px !important;
+            line-height: 80px !important;
+            margin-top: -40px !important;
+            margin-left: -40px !important;
+            border: 2px solid #fff !important;
         }
 
-        /* Customize control bar */
+        /* Modern Control Bar */
         .vjs-control-bar {
-            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%) !important;
-            height: 3.5em !important;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9)) !important;
+            height: 50px !important;
         }
 
+        /* Loading Spinner Overlay */
         .loading {
             position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            inset: 0;
+            background: #000;
             z-index: 9999;
-            transition: opacity 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s;
         }
-
         .loading.hidden { opacity: 0; pointer-events: none; }
-
+        
         .spinner {
-            width: 60px; height: 60px;
-            border: 5px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
+            width: 50px; height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 768px) {
@@ -117,7 +128,8 @@
     </style>
 </head>
 <body>
-    <div class="loading" id="loading"><div class="spinner"></div></div>
+
+    <div class="loading" id="loader"><div class="spinner"></div></div>
 
     <div class="container">
         <div class="file-info">
@@ -125,31 +137,41 @@
         </div>
 
         <div class="player-wrapper">
+            <!-- Latest Video.js Setup -->
             <video 
-                id="player" 
-                class="video-js vjs-default-skin vjs-big-play-centered" 
-                controls 
-                preload="auto" 
-                playsinline
-                oncontextmenu="return false;">
-                <source src="{{ file_url }}" type="application/x-mpegURL">
+                id="main-player" 
+                class="video-js vjs-big-play-centered vjs-show-big-play-button-on-pause"
+                playsinline 
+                preload="auto">
+                <p class="vjs-no-js">To view this video please enable JavaScript</p>
             </video>
         </div>
     </div>
 
-    <!-- Video.js Script -->
+    <!-- Video.js Core Script -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
 
     <script>
-        // Disable Right Click and Selection
+        // Security: Prevent context menu and selection
         document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('selectstart', e => e.preventDefault());
+        
+        const videoUrl = "{{ file_url }}";
+        const loader = document.getElementById('loader');
 
-        // Initialize Video.js
-        const player = videojs('player', {
-            playbackRates: [0.5, 1, 1.25, 1.5, 2],
+        // Determine type (HLS or MP4)
+        const videoType = videoUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+
+        // Initialize Player
+        const player = videojs('main-player', {
+            controls: true,
+            autoplay: false,
             fluid: true,
             responsive: true,
+            playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            userActions: {
+                hotkeys: true,
+                doubleClick: false // We will handle custom skip logic
+            },
             controlBar: {
                 children: [
                     'playToggle',
@@ -159,80 +181,71 @@
                     'durationDisplay',
                     'progressControl',
                     'playbackRateMenuButton',
-                    'subsCapsButton',
-                    'qualitySelector',
                     'fullscreenToggle',
-                ],
-            },
+                ]
+            }
         });
 
-        const videoElement = document.getElementById('player_html5_api');
-        const loadingScreen = document.getElementById('loading');
+        // Set Source
+        player.src({
+            src: videoUrl,
+            type: videoType
+        });
 
-        function hideLoading() {
-            setTimeout(() => loadingScreen.classList.add('hidden'), 500);
-        }
+        // Hide Loader
+        player.on('ready', () => {
+            loader.classList.add('hidden');
+        });
 
-        // Hide loader when video is ready
-        player.on('canplay', hideLoading);
-
-        // Error Handling
-        let errorRetryCount = 0;
+        // Error Handling & Auto Retry
+        let retryCount = 0;
         player.on('error', () => {
-            if (errorRetryCount < 3) {
-                errorRetryCount++;
+            if (retryCount < 3) {
+                retryCount++;
+                console.log('Retrying connection...');
                 setTimeout(() => {
-                    player.src({ src: "{{ file_url }}", type: 'application/x-mpegURL' });
+                    player.src({ src: videoUrl, type: videoType });
                     player.load();
                     player.play();
                 }, 2000);
             }
         });
 
-        // Double Click / Double Tap Skip Logic
-        let lastTapTime = 0;
-        let lastTapX = 0;
+        /* --- CUSTOM SKIP LOGIC (DOUBLE CLICK/TAP) --- */
+        let lastTap = 0;
+        const playerElement = document.getElementById('main-player');
 
-        const handleDoubleTap = (clientX) => {
+        const handleDoubleTap = (e) => {
             const now = Date.now();
-            const rect = player.el().getBoundingClientRect();
-            const x = clientX - rect.left;
+            const TIMESPAN = 300; // ms
+            
+            if (now - lastTap < TIMESPAN) {
+                const rect = playerElement.getBoundingClientRect();
+                const x = (e.type === 'touchend') ? e.changedTouches[0].clientX - rect.left : e.clientX - rect.left;
+                const width = rect.width;
 
-            if (now - lastTapTime < 300 && Math.abs(clientX - lastTapX) < 50) {
-                // Determine Left or Right side
-                if (x < rect.width / 3) {
-                    // Skip backward
+                if (x < width / 3) {
+                    // Left 1/3: Rewind 10s
                     player.currentTime(Math.max(0, player.currentTime() - 10));
-                } else if (x > (rect.width * 2) / 3) {
-                    // Skip forward
+                } else if (x > (width * 2) / 3) {
+                    // Right 1/3: Forward 10s
                     player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
                 }
-                lastTapTime = 0; // Reset
-            } else {
-                lastTapTime = now;
-                lastTapX = clientX;
             }
+            lastTap = now;
         };
 
         // Desktop Double Click
-        player.on('click', (e) => {
-            handleDoubleTap(e.clientX);
-        });
-
+        player.on('mousedown', handleDoubleTap);
         // Mobile Double Tap
-        player.on('touchend', (e) => {
-            handleDoubleTap(e.changedTouches[0].clientX);
-        });
+        player.on('touchend', handleDoubleTap);
 
-        // Prevention for save-as
+        // Security: Block keyboard shortcuts for saving
         document.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) e.preventDefault();
+            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+            }
         });
-
-        // Auto-hide loading if video takes too long to trigger 'canplay'
-        setTimeout(() => {
-            if (!loadingScreen.classList.contains('hidden')) hideLoading();
-        }, 5000);
     </script>
 </body>
 </html>
