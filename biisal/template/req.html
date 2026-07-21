@@ -19,33 +19,33 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: var(--bg-gradient);
-            font-family: 'Raleway', sans-serif;
-            color: white;
-            min-height: 100vh;
-            overflow-x: hidden;
-            -webkit-user-select: none;
-            user-select: none;
+    background: #000;                /* Solid black, no gradient */
+    font-family: 'Raleway', sans-serif;
+    color: white;
+    height: 100vh;
+    overflow: hidden;               /* No scrollbars */
+    -webkit-user-select: none;
+    user-select: none;
         }
 
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 100vh;
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;    /* Title at top, player fills rest */
+    max-width: none;
         }
 
         /* File Info Bar */
         .file-info {
-            background: var(--glass-bg);
-            padding: 15px 20px;
-            border-radius: 12px 12px 0 0;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-bottom: none;
-            overflow: hidden;
+    background: transparent;        /* No background */
+    padding: 12px 24px;             /* Keep some padding for text */
+    border: none;
+    border-radius: 0;
+    overflow: hidden;
         }
 
         .file-name-marquee {
@@ -64,12 +64,14 @@
 
         /* Player Wrapper */
         .player-wrapper {
-            position: relative;
-            background: #000;
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-            border: 1px solid rgba(255,255,255,0.1);
-            overflow: hidden;
+    position: relative;
+    flex: 1;                        /* Fill remaining height */
+    min-height: 0;                  /* Prevent overflow issues */
+    background: #000;               /* Keep black for video area */
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
         }
 
         /* Loading Spinner Overlay */
