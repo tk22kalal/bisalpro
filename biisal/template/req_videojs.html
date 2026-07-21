@@ -1,154 +1,597 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ file_name }}</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway|Delius">
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: #000; 
-            font-family: 'Raleway', sans-serif; 
-            overflow-x: hidden; 
-            -webkit-touch-callout: none; 
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        marquee { font-size: 18px; font-weight: 600; color: #fff; background: rgba(0,0,0,0.9); padding: 10px; font-family: 'Delius', serif; width: 100%; }
-        .container { width: 100%; background: #000; position: relative; }
-        .video-js { width: 100% !important; height: auto !important; aspect-ratio: 16 / 9; }
-        
-        /* HIDE NATIVE DOWNLOAD CONTROLS */
-        video::-webkit-media-controls-download-button { display: none !important; }
-        video::-webkit-media-controls-enclosure { overflow: hidden !important; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ file_name }}</title>
+  <!-- VideoJS CSS required for HLS tech layer -->
+  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+  <style>
+    :root {
+      --progress-played: #ff5722;
+      --progress-dot: #ff0000;
+      --progress-buffered: rgba(255, 255, 255, 0.4);
+      --progress-bg: rgba(255, 255, 255, 0.2);
+      --speed-bg: rgba(28, 28, 28, 0.98);
+      --font: system-ui, -apple-system, sans-serif;
+    }
 
-        .vjs-tech { object-fit: contain; }
-        .tap-indicator { position: absolute; top: 50%; transform: translateY(-50%); font-size: 60px; color: rgba(255,255,255,0.95); pointer-events: none; z-index: 10000; animation: tapFade 0.5s ease-out forwards; }
-        .tap-indicator.left  { left: 50px; }
-        .tap-indicator.right { right: 50px; }
-        @keyframes tapFade { 0% { opacity: 1; transform: translateY(-50%) scale(0.8); } 50% { transform: translateY(-50%) scale(1.2); } 100% { opacity: 0; transform: translateY(-50%) scale(0.8); } }
-        .vjs-control-bar { background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important; }
-        .vjs-big-play-button { border-radius: 50% !important; width: 2em !important; height: 2em !important; line-height: 2em !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-        .vjs-quality-button .vjs-icon-placeholder::before { content: 'HD'; font-size: 1.5em; line-height: 1.67; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
 
-        @media (max-width: 768px) { 
-            marquee { font-size: 14px; } 
-            .tap-indicator { font-size: 48px; }
-        }
-    </style>
+    body {
+      background-color: #0f0f0f;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: var(--font);
+      overflow-x: hidden;
+    }
+
+    /* ── MARQUEE TITLE ── */
+    .title-bar {
+      width: 100%;
+      max-width: 850px;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 10px 14px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .title-bar marquee { display: block; }
+
+    /* ── PLAYER CONTAINER ── */
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 850px;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* ── VIDEOJS TECH LAYER (hidden UI, visible video) ── */
+    .video-container .video-js {
+      position: absolute !important;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .video-js .vjs-control-bar,
+    .video-js .vjs-big-play-button,
+    .video-js .vjs-loading-spinner,
+    .video-js .vjs-error-display,
+    .video-js .vjs-text-track-display { display: none !important; }
+    .vjs-tech { object-fit: contain; width: 100% !important; height: 100% !important; cursor: pointer; }
+
+    /* HIDE NATIVE DOWNLOAD */
+    video::-webkit-media-controls-download-button { display: none !important; }
+    video::-webkit-media-controls-enclosure { overflow: hidden !important; }
+
+    /* ── TOP SHADOW ── */
+    .top-controls-bg {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 80px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+      z-index: 10;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    /* ── BUFFER SPINNER ── */
+    .buffer-overlay {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 15; display: none; pointer-events: none;
+    }
+    .spinner {
+      width: 60px; height: 60px;
+      border: 5px solid rgba(255,255,255,0.2);
+      border-top: 5px solid #ffffff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+
+    /* ── SETTINGS GEAR ── */
+    .settings-btn {
+      position: absolute; top: 15px; right: 15px; z-index: 20;
+      background: none; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.3s;
+    }
+
+    .settings-menu {
+      position: absolute; top: 55px; right: 15px;
+      background: var(--speed-bg);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px; width: 320px;
+      display: none; flex-direction: column;
+      z-index: 30; overflow: hidden; padding-bottom: 12px;
+    }
+    .settings-menu.active { display: flex; }
+
+    .menu-view { padding: 5px 0; }
+    .menu-item {
+      padding: 12px 16px; color: #fff; font-size: 14px;
+      cursor: pointer; display: flex; justify-content: space-between;
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.1); }
+
+    /* ── SPEED UI ── */
+    .speed-view { display: none; padding: 8px 15px; }
+    .speed-top-nav { display: flex; align-items: center; height: 30px; }
+    .back-btn { background: none; border: none; cursor: pointer; padding: 5px; }
+    .speed-display-large { color: #fff; font-size: 22px; font-weight: 500; text-align: center; margin-bottom: 12px; margin-top: -15px; }
+    .slider-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 18px; }
+    .adj-btn { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .speed-range { -webkit-appearance: none; width: 160px; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; outline: none; }
+    .speed-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
+    .pills-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: flex-start; }
+    .pill-wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .pill { background: rgba(255,255,255,0.1); border: none; color: #fff; width: 48px; height: 36px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .pill:hover { background: rgba(255,255,255,0.2); }
+    .normal-label { font-size: 11px; color: rgba(255,255,255,0.6); }
+
+    /* ── CENTER PLAY/PAUSE ── */
+    .center-play {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px; height: 80px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+      z-index: 10; cursor: pointer; transition: opacity 0.3s;
+    }
+
+    /* ── AUTO-HIDE ── */
+    .video-container.inactive .controls-overlay,
+    .video-container.inactive .settings-btn,
+    .video-container.inactive .center-play,
+    .video-container.inactive .top-controls-bg {
+      opacity: 0; pointer-events: none;
+    }
+
+    /* ── SEEK ANIMATIONS ── */
+    .seek-feedback {
+      position: absolute; top: 0; bottom: 0; width: 50%;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: 4; opacity: 0;
+    }
+    .seek-left { left: 0; } .seek-right { right: 0; }
+    .seek-feedback svg { width: 50px; fill: rgba(0,0,0,0.6); }
+    @keyframes seekAnim {
+      0%   { opacity: 0; transform: scale(0.8); }
+      30%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.1); }
+    }
+    .animate-seek { animation: seekAnim 0.6s ease-out forwards; }
+
+    /* ── CONTROLS OVERLAY ── */
+    .controls-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 10px 15px 15px 15px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 25; transition: opacity 0.3s;
+    }
+    .controls-row { display: flex; align-items: center; justify-content: space-between; }
+    .time-box { color: #fff; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .action-group { display: flex; align-items: center; gap: 14px; }
+    .ctrl-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; }
+    .ctrl-btn svg { width: 24px; height: 24px; fill: #fff; }
+
+    /* ── SEEK/PROGRESS BAR ── */
+    .prog-container { width: 100%; display: flex; align-items: center; }
+    .prog-bar {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px; border-radius: 2px;
+      background: var(--progress-bg); outline: none; cursor: pointer;
+    }
+    .prog-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--progress-dot);
+      box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    }
+
+    @media (max-width: 768px) {
+      .title-bar { font-size: 13px; }
+    }
+  </style>
 </head>
 <body>
-    <header><marquee><div id="file-name">{{ file_name }}</div></marquee></header>
 
-    <div class="container">
-        <video id="player" 
-            class="video-js vjs-default-skin vjs-big-play-centered" 
-            controls 
-            preload="metadata" 
-            playsinline 
-            controlsList="nodownload" 
-            oncontextmenu="return false;"
-            crossorigin="anonymous"
-            {% if poster_url %}poster="{{ poster_url }}"{% endif %}>
-            <source src="{{ file_url }}" type="application/x-mpegURL">
-        </video>
+  <!-- Dynamic video title (marquee) -->
+  <div class="title-bar"><marquee>{{ file_name }}</marquee></div>
+
+  <div class="video-container" id="playerContainer">
+
+    <!-- VideoJS element — HLS source, controls disabled via JS init -->
+    <video id="player"
+      class="video-js"
+      preload="auto"
+      playsinline
+      controlsList="nodownload"
+      oncontextmenu="return false;"
+      crossorigin="anonymous"
+      {% if poster_url %}poster="{{ poster_url }}"{% endif %}>
+      <source src="{{ file_url }}" type="application/x-mpegURL">
+    </video>
+
+    <!-- Top gradient -->
+    <div class="top-controls-bg" id="topShadow"></div>
+
+    <!-- Buffer spinner -->
+    <div class="buffer-overlay" id="bufferSpinner">
+      <div class="spinner"></div>
     </div>
 
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@4.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
+    <!-- Settings gear (top-right) -->
+    <button class="settings-btn" id="setBtn">
+      <svg viewBox="0 0 24 24" fill="white" width="28">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+    </button>
 
-    <script>
-    (function() {
-        'use strict';
-        const playerElement = document.getElementById('player');
-        const container = document.querySelector('.container');
-        const isVideo = playerElement.tagName.toLowerCase() === 'video';
-        let lastTapTime = 0, lastTapSide = null;
+    <!-- Settings menu -->
+    <div class="settings-menu" id="setMenu">
+      <div id="mainMenuView" class="menu-view">
+        <div class="menu-item" id="openSpeed">Speed <span id="currentSpeedLabel">1x</span></div>
+        <div class="menu-item" id="openQuality">Quality <span id="currentQualityLabel">Auto</span></div>
+        <div class="menu-item" id="pipOption">Picture-in-Picture</div>
+      </div>
 
-        // Custom Quality Button Logic
-        const QualityButton = videojs.extend(videojs.getComponent('MenuButton'), {
-            constructor: function(p, o) {
-                videojs.getComponent('MenuButton').call(this, p, o);
-                this.addClass('vjs-quality-button');
-                this.controlText('Quality');
-            },
-            createItems: function() {
-                const items = [];
-                const levels = this.player().qualityLevels();
-                if (!levels) return items;
-                const MenuItem = videojs.getComponent('MenuItem');
-                items.push(new MenuItem(this.player(), { label: 'Auto', selected: true, selectable: true }));
-                const heights = [];
-                for (let i = 0; i < levels.length; i++) {
-                    if (levels[i].height && !heights.includes(levels[i].height)) heights.push(levels[i].height);
-                }
-                heights.sort((a, b) => b - a).forEach(h => {
-                    const item = new MenuItem(this.player(), { label: h + 'p', selectable: true });
-                    item.on('click', () => {
-                        for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === h);
-                    });
-                    items.push(item);
-                });
-                return items;
-            }
-        });
-        videojs.registerComponent('QualityButton', QualityButton);
+      <!-- Speed sub-view -->
+      <div id="speedView" class="speed-view">
+        <div class="speed-top-nav">
+          <button class="back-btn" id="backToMenu">
+            <svg viewBox="0 0 24 24" width="22" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+        </div>
+        <div class="speed-display-large" id="largeSpeedLabel">1.0x</div>
+        <div class="slider-row">
+          <button class="adj-btn" id="minusBtn">−</button>
+          <input type="range" class="speed-range" id="speedRange" min="0.25" max="3" step="0.05" value="1">
+          <button class="adj-btn" id="plusBtn">+</button>
+        </div>
+        <div class="pills-container">
+          <button class="pill" data-val="0.5">0.5</button>
+          <div class="pill-wrapper">
+            <button class="pill" data-val="1.0">1.0</button>
+            <span class="normal-label">Normal</span>
+          </div>
+          <button class="pill" data-val="1.5">1.5</button>
+          <button class="pill" data-val="2.0">2.0</button>
+          <button class="pill" data-val="3.0">3.0</button>
+        </div>
+      </div>
 
-        const player = videojs('player', {
-            playbackRates: [0.5, 1, 1.5, 2],
-            nativeControlsForTouch: false,
-            controlBar: {
-                children: ['playToggle', 'progressControl', 'volumePanel', 'qualityButton', 'playbackRateMenuButton', 'fullscreenToggle']
-            },
-            html5: { 
-                vhs: { overrideNative: false, enableLowInitialPlaylist: true } 
-            }
-        });
+      <!-- Quality sub-view -->
+      <div id="qualityView" class="speed-view">
+        <div class="speed-top-nav">
+          <button class="back-btn" id="backToMenuFromQuality">
+            <svg viewBox="0 0 24 24" width="22" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+        </div>
+        <div id="qualityList" style="padding: 4px 0;"></div>
+      </div>
+    </div>
 
-        // ─────────────────────────────────────────
-        // PLAYER CONTROLS & INTERACTIONS
-        // ─────────────────────────────────────────
-        
-        // DISABLE LONG PRESS & CONTEXT MENU
-        playerElement.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
-        
-        let pressTimer;
-        playerElement.addEventListener('touchstart', e => {
-            pressTimer = setTimeout(() => { e.preventDefault(); }, 500);
-        }, { passive: false });
+    <!-- Seek feedback animations -->
+    <div class="seek-feedback seek-left" id="seekLeft">
+      <svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+    </div>
+    <div class="seek-feedback seek-right" id="seekRight">
+      <svg viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+    </div>
 
-        playerElement.addEventListener('touchend',  () => clearTimeout(pressTimer));
-        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    <!-- Center play/pause button -->
+    <div class="center-play" id="centerPlay">
+      <svg id="playIcon" viewBox="0 0 24 24" width="34"><path d="M8 5v14l11-7z" fill="black"/></svg>
+    </div>
 
-        // DOUBLE TAP TO SEEK (10s)
-        function handleTap(e) {
-            if (!isVideo) return;
-            const now = Date.now();
-            const rect = playerElement.getBoundingClientRect();
-            const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-            const isLeft = x < rect.width / 2;
-            if (now - lastTapTime < 300 && isLeft === lastTapSide) {
-                if (isLeft) { player.currentTime(Math.max(0, player.currentTime() - 10)); showIndicator('left', '⏪ 10s'); }
-                else { player.currentTime(Math.min(player.duration(), player.currentTime() + 10)); showIndicator('right', '10s ⏩'); }
-            }
-            lastTapTime = now; lastTapSide = isLeft;
-        }
+    <!-- Bottom controls overlay -->
+    <div class="controls-overlay">
+      <div class="controls-row">
+        <div class="time-box"><span id="currTime">0:00</span> / <span id="durEl">0:00</span></div>
+        <div class="action-group">
+          <button class="ctrl-btn" id="volBtn">
+            <svg id="volIcon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+          </button>
+          <button class="ctrl-btn" id="fullBtn">
+            <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="prog-container">
+        <input type="range" class="prog-bar" id="progBar" min="0" max="100" value="0" step="0.1">
+      </div>
+    </div>
+  </div>
 
-        function showIndicator(side, text) {
-            const el = document.createElement('div');
-            el.className = `tap-indicator ${side}`;
-            el.innerHTML = text;
-            container.appendChild(el);
-            setTimeout(() => el.remove(), 500);
-        }
+  <!-- VideoJS + Quality Levels plugin -->
+  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@4.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
-        player.ready(() => {
-            playerElement.addEventListener('touchstart', handleTap, { passive: true });
-            playerElement.addEventListener('click', handleTap);
-        });
-    })();
-    </script>
+  <script>
+  (function () {
+    'use strict';
+
+    // ── VIDEOJS INIT (HLS, no built-in controls) ──────────────────────────────
+    const player = videojs('player', {
+      controls: false,
+      nativeControlsForTouch: false,
+      html5: {
+        vhs: { overrideNative: false, enableLowInitialPlaylist: true }
+      }
+    });
+
+    const container    = document.getElementById('playerContainer');
+    const progBar      = document.getElementById('progBar');
+    const currTimeEl   = document.getElementById('currTime');
+    const durEl        = document.getElementById('durEl');
+    const setBtn       = document.getElementById('setBtn');
+    const setMenu      = document.getElementById('setMenu');
+    const centerPlay   = document.getElementById('centerPlay');
+    const playIcon     = document.getElementById('playIcon');
+    const speedRange   = document.getElementById('speedRange');
+    const bufferSpinner = document.getElementById('bufferSpinner');
+    const volIcon      = document.getElementById('volIcon');
+
+    let hideTimer;
+
+    // ── SECURITY: DISABLE RIGHT-CLICK & LONG-PRESS ───────────────────────────
+    container.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
+    let pressTimer;
+    container.addEventListener('touchstart', e => {
+      pressTimer = setTimeout(() => { e.preventDefault(); }, 500);
+    }, { passive: false });
+    container.addEventListener('touchend',  () => clearTimeout(pressTimer));
+    container.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+    // ── BUFFERING SPINNER ────────────────────────────────────────────────────
+    player.on('waiting',  () => { bufferSpinner.style.display = 'block'; });
+    player.on('playing',  () => { bufferSpinner.style.display = 'none'; });
+    player.on('canplay',  () => { bufferSpinner.style.display = 'none'; });
+    player.on('seeking',  () => { bufferSpinner.style.display = 'block'; });
+    player.on('seeked',   () => { bufferSpinner.style.display = 'none'; });
+
+    // ── AUTO-HIDE UI ─────────────────────────────────────────────────────────
+    function showUI() {
+      container.classList.remove('inactive');
+      resetHideTimer();
+    }
+    function hideUI() {
+      container.classList.add('inactive');
+      setMenu.classList.remove('active');
+    }
+    function resetHideTimer() {
+      clearTimeout(hideTimer);
+      if (!player.paused()) hideTimer = setTimeout(hideUI, 3500);
+    }
+
+    player.on('play',  () => {
+      playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="black"/>';
+      resetHideTimer();
+    });
+    player.on('pause', () => {
+      playIcon.innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>';
+      showUI();
+    });
+
+    // ── CLICK / DOUBLE-TAP: TOGGLE PLAY or SEEK ──────────────────────────────
+    let clickTimeout;
+    let lastTapTime = 0, lastTapSide = null;
+
+    function handleInteraction(e) {
+      const now = Date.now();
+      const rect = container.getBoundingClientRect();
+      const x = (e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0) - rect.left;
+      const isLeft = x < rect.width / 2;
+
+      if (now - lastTapTime < 300 && isLeft === lastTapSide) {
+        clearTimeout(clickTimeout);
+        const delta = isLeft ? -10 : 10;
+        player.currentTime(Math.max(0, Math.min(player.duration(), player.currentTime() + delta)));
+        const el = document.getElementById(isLeft ? 'seekLeft' : 'seekRight');
+        el.classList.remove('animate-seek'); void el.offsetWidth; el.classList.add('animate-seek');
+        lastTapTime = 0;
+        return;
+      }
+      lastTapTime = now;
+      lastTapSide = isLeft;
+
+      clearTimeout(clickTimeout);
+      clickTimeout = setTimeout(() => {
+        if (container.classList.contains('inactive')) showUI();
+        else hideUI();
+      }, 250);
+    }
+
+    // Attach to the VideoJS tech element (the actual <video>).
+    // Use `pointerup` only — it fires exactly once per tap/click on both
+    // touch and mouse, so we never double-fire the handler the way
+    // touchstart + synthetic-click would on mobile.
+    player.ready(function () {
+      const techEl = player.el().querySelector('.vjs-tech');
+      if (techEl) {
+        techEl.addEventListener('pointerup', handleInteraction);
+      }
+    });
+
+    // Center play/pause button
+    centerPlay.addEventListener('click', e => {
+      e.stopPropagation();
+      if (player.paused()) player.play();
+      else player.pause();
+      resetHideTimer();
+    });
+
+    // ── PROGRESS / SEEK BAR ───────────────────────────────────────────────────
+    const fmt = s => isNaN(s) ? '0:00' : `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+
+    function updateProgressBar() {
+      const cur = player.currentTime();
+      const dur = player.duration();
+      const played = (cur / dur) * 100 || 0;
+
+      let bufferedEnd = 0;
+      const buf = player.buffered();
+      for (let i = 0; i < buf.length; i++) {
+        if (buf.start(i) <= cur) bufferedEnd = buf.end(i);
+      }
+      const buffered = (bufferedEnd / dur) * 100 || 0;
+
+      progBar.value = played;
+      progBar.style.background = `linear-gradient(to right,
+        var(--progress-played) 0%,
+        var(--progress-played) ${played}%,
+        var(--progress-buffered) ${played}%,
+        var(--progress-buffered) ${buffered}%,
+        var(--progress-bg) ${buffered}%,
+        var(--progress-bg) 100%)`;
+    }
+
+    player.on('timeupdate', () => {
+      currTimeEl.textContent = fmt(player.currentTime());
+      updateProgressBar();
+    });
+    player.on('progress', updateProgressBar);
+    player.on('loadedmetadata', () => {
+      durEl.textContent = fmt(player.duration());
+    });
+
+    progBar.addEventListener('input', e => {
+      player.currentTime((e.target.value / 100) * player.duration());
+      resetHideTimer();
+    });
+
+    // ── VOLUME / MUTE ────────────────────────────────────────────────────────
+    document.getElementById('volBtn').addEventListener('click', e => {
+      e.stopPropagation();
+      player.muted(!player.muted());
+      volIcon.style.opacity = player.muted() ? 0.4 : 1;
+      resetHideTimer();
+    });
+
+    // ── FULLSCREEN ───────────────────────────────────────────────────────────
+    document.getElementById('fullBtn').addEventListener('click', e => {
+      e.stopPropagation();
+      if (player.isFullscreen()) player.exitFullscreen();
+      else player.requestFullscreen();
+      resetHideTimer();
+    });
+
+    // ── SETTINGS MENU ────────────────────────────────────────────────────────
+    setBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setMenu.classList.toggle('active');
+      resetHideTimer();
+    });
+    document.addEventListener('click', () => setMenu.classList.remove('active'));
+
+    function showView(viewId) {
+      ['mainMenuView', 'speedView', 'qualityView'].forEach(id => {
+        document.getElementById(id).style.display = id === viewId ? (id === 'mainMenuView' ? 'block' : 'block') : 'none';
+      });
+    }
+
+    document.getElementById('openSpeed').addEventListener('click', e => {
+      e.stopPropagation(); showView('speedView');
+    });
+    document.getElementById('backToMenu').addEventListener('click', e => {
+      e.stopPropagation(); showView('mainMenuView');
+    });
+    document.getElementById('backToMenuFromQuality').addEventListener('click', e => {
+      e.stopPropagation(); showView('mainMenuView');
+    });
+
+    // ── SPEED CONTROL ────────────────────────────────────────────────────────
+    function updateSpeed(val) {
+      val = Math.max(0.25, Math.min(3, parseFloat(val)));
+      player.playbackRate(val);
+      speedRange.value = val;
+      const text = val.toFixed(2).replace(/[.,]00$/, '') + 'x';
+      document.getElementById('largeSpeedLabel').textContent = text;
+      document.getElementById('currentSpeedLabel').textContent = text;
+    }
+
+    speedRange.addEventListener('input', e => updateSpeed(e.target.value));
+    document.getElementById('minusBtn').addEventListener('click', e => { e.stopPropagation(); updateSpeed(player.playbackRate() - 0.05); });
+    document.getElementById('plusBtn').addEventListener('click', e => { e.stopPropagation(); updateSpeed(player.playbackRate() + 0.05); });
+    document.querySelectorAll('.pill').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation(); updateSpeed(btn.dataset.val);
+    }));
+
+    // ── QUALITY CONTROL (via quality-levels plugin) ───────────────────────────
+    document.getElementById('openQuality').addEventListener('click', e => {
+      e.stopPropagation();
+      const levels = player.qualityLevels();
+      const list = document.getElementById('qualityList');
+      list.innerHTML = '';
+
+      const makeItem = (label, onClick, isCurrent) => {
+        const div = document.createElement('div');
+        div.className = 'menu-item';
+        div.style.cssText = 'justify-content:flex-start; gap:10px;';
+        div.innerHTML = `<span style="color:${isCurrent ? '#ff5722' : '#fff'}">${isCurrent ? '✓' : '　'}</span><span>${label}</span>`;
+        div.addEventListener('click', e => { e.stopPropagation(); onClick(); showView('mainMenuView'); });
+        list.appendChild(div);
+      };
+
+      // Auto option
+      let currentIsAuto = true;
+      for (let i = 0; i < levels.length; i++) {
+        if (!levels[i].enabled) { currentIsAuto = false; break; }
+      }
+
+      makeItem('Auto', () => {
+        for (let i = 0; i < levels.length; i++) levels[i].enabled = true;
+        document.getElementById('currentQualityLabel').textContent = 'Auto';
+      }, currentIsAuto);
+
+      const heights = [];
+      for (let i = 0; i < levels.length; i++) {
+        if (levels[i].height && !heights.includes(levels[i].height)) heights.push(levels[i].height);
+      }
+      heights.sort((a, b) => b - a).forEach(h => {
+        const isCur = !currentIsAuto && levels[0] && levels[0].height === h;
+        makeItem(h + 'p', () => {
+          for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === h);
+          document.getElementById('currentQualityLabel').textContent = h + 'p';
+        }, isCur);
+      });
+
+      showView('qualityView');
+    });
+
+    // ── PICTURE-IN-PICTURE ───────────────────────────────────────────────────
+    document.getElementById('pipOption').addEventListener('click', e => {
+      e.stopPropagation();
+      setMenu.classList.remove('active');
+      const techEl = player.el().querySelector('.vjs-tech');
+      if (techEl && document.pictureInPictureEnabled) {
+        if (document.pictureInPictureElement) document.exitPictureInPicture();
+        else techEl.requestPictureInPicture();
+      }
+    });
+
+  })();
+  </script>
 </body>
 </html>
