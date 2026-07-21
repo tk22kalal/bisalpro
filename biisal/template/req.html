@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>{{ file_name }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700&family=Delius&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <!-- Video.js CSS -->
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <!-- hls.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,31 +63,30 @@
 
         .player-wrapper {
             position: relative;
-            border-radius: 8px;
+            border-radius: 0 0 12px 12px;
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
 
-        .plyr { border-radius: 0 0 12px 12px; }
-
-        /* REMOVED: Large middle play button styling */
-        .plyr__control--overlaid {
-            display: none !important;
+        /* Video.js custom skin – dark & clean */
+        .video-js {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            border-radius: 0 0 12px 12px;
+        }
+        .video-js .vjs-control-bar {
+            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+        }
+        .video-js .vjs-big-play-button {
+            display: none !important;   /* removed the big centre play icon */
         }
 
-        /* Poster shown while the video loads, instead of a black screen */
-        .plyr__poster {
+        /* Poster shown while loading */
+        .vjs-poster {
             background-size: cover;
             background-position: center;
-        }
-
-        .plyr__controls {
-            background: linear-gradient(0deg, rgba(0,0,0,0.8), transparent);
-            padding: 15px;
-        }
-
-        .plyr--video .plyr__controls {
-            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
         }
 
         .loading {
@@ -127,57 +128,83 @@
         </div>
 
         <div class="player-wrapper">
-            <!-- Seek indicators HTML removed -->
-            <video id="player" controls playsinline crossorigin="anonymous"
-                controlslist="nodownload noremoteplayback"
-                disablepictureinpicture="false"
-                preload="auto"
-                {% if poster_url %}poster="{{ poster_url }}"{% endif %}
-                oncontextmenu="return false;">
+            <!-- Video element – Video.js will use this -->
+            <video id="player" class="video-js vjs-default-skin" 
+                   controls playsinline crossorigin="anonymous"
+                   preload="auto"
+                   {% if poster_url %}poster="{{ poster_url }}"{% endif %}
+                   oncontextmenu="return false;">
             </video>
         </div>
     </div>
 
-    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    <!-- Video.js library -->
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+
     <script>
+        // ---- Prevent context menu & selection ----
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.addEventListener('selectstart', e => e.preventDefault());
 
+        // ---- Prevent long-press context menu on mobile ----
         let longPressTimer;
         document.addEventListener('touchstart', e => { longPressTimer = setTimeout(() => e.preventDefault(), 500); });
         document.addEventListener('touchend',   () => clearTimeout(longPressTimer));
         document.addEventListener('touchmove',  () => clearTimeout(longPressTimer));
 
+        // ---- Video source ----
         const videoSource = "{{ file_url }}";
         const isHLS = videoSource.includes('.m3u8');
 
-        const player = new Plyr('#player', {
-            // 'play-large' removed from controls to remove middle play icon
-            controls: ['rewind','play','fast-forward','progress','current-time','duration','settings','pip','fullscreen'],
-            settings: ['quality', 'speed'],
-            speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
-            quality: { default: 720, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
-            ratio: '16:9',
-            fullscreen: { enabled: true, fallback: true, iosNative: true },
-            autopause: false,
-            resetOnEnd: false,
-            keyboard: { focused: true, global: true },
-            tooltips: { controls: true, seek: true }
+        // ---- Get video element ----
+        const videoElement = document.getElementById('player');
+
+        // ---- Initialize Video.js ----
+        const player = videojs('player', {
+            controls: true,
+            bigPlayButton: false,                 // removed as requested
+            playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            controlBar: {
+                skipBackward: 10,                 // 10s rewind button
+                skipForward: 10,                  // 10s forward button
+                children: [
+                    'playToggle',
+                    'skipBackward',
+                    'skipForward',
+                    'progressControl',
+                    'currentTimeDisplay',
+                    'durationDisplay',
+                    'playbackRateMenuButton',
+                    'pictureInPictureToggle',
+                    'fullscreenToggle'
+                ]
+            },
+            fullscreen: {
+                options: { iosNative: true }      // best iOS fullscreen
+            },
+            autoplay: false,
+            muted: false,
+            preload: 'auto'
         });
 
-        const videoElement = document.getElementById('player');
-        let errorRetryCount = 0;
-
+        // ---- Hide loading spinner ----
         function hideLoading() {
             setTimeout(() => document.getElementById('loading').classList.add('hidden'), 500);
         }
 
+        // ---- Handle HLS vs direct source (exactly as before) ----
+        let errorRetryCount = 0;
+
         if (isHLS && Hls.isSupported()) {
             const hls = new Hls({
-                enableWorker: true, backBufferLength: 90,
-                maxBufferLength: 30, maxBufferSize: 60 * 1000 * 1000,
-                manifestLoadingTimeOut: 10000, manifestLoadingMaxRetry: 3,
-                fragLoadingTimeOut: 20000, fragLoadingMaxRetry: 6
+                enableWorker: true,
+                backBufferLength: 90,
+                maxBufferLength: 30,
+                maxBufferSize: 60 * 1000 * 1000,
+                manifestLoadingTimeOut: 10000,
+                manifestLoadingMaxRetry: 3,
+                fragLoadingTimeOut: 20000,
+                fragLoadingMaxRetry: 6
             });
             hls.loadSource(videoSource);
             hls.attachMedia(videoElement);
@@ -185,7 +212,8 @@
             hls.on(Hls.Events.ERROR, (e, data) => {
                 if (data.fatal) {
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR && errorRetryCount < 3) {
-                        errorRetryCount++; hls.startLoad();
+                        errorRetryCount++;
+                        hls.startLoad();
                     } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         hls.recoverMediaError();
                     } else {
@@ -199,20 +227,25 @@
             videoElement.addEventListener('loadedmetadata', hideLoading);
         }
 
-        // Keep skip logic but removed visual showSeek icons
+        // ---- Double‑tap seek (converted to Video.js API) ----
         let lastTapTime = 0, lastTapX = 0;
         videoElement.addEventListener('click', function(e) {
             const now = Date.now();
             if (now - lastTapTime < 300 && Math.abs(e.clientX - lastTapX) < 50) {
                 const rect = videoElement.getBoundingClientRect();
                 const x = e.clientX - rect.left;
+                const current = player.currentTime();
                 if (x < rect.width / 3) {
-                    player.currentTime = Math.max(0, player.currentTime - 10);
+                    player.currentTime(Math.max(0, current - 10));
                 } else if (x > rect.width * 2 / 3) {
-                    player.currentTime = Math.min(player.duration, player.currentTime + 10);
+                    const dur = player.duration();
+                    player.currentTime(Math.min(dur, current + 10));
                 }
                 lastTapTime = 0;
-            } else { lastTapTime = now; lastTapX = e.clientX; }
+            } else {
+                lastTapTime = now;
+                lastTapX = e.clientX;
+            }
         });
 
         let lastTouchTime = 0, lastTouchX = 0;
@@ -222,26 +255,37 @@
             if (now - lastTouchTime < 300 && Math.abs(touch.clientX - lastTouchX) < 50) {
                 const rect = videoElement.getBoundingClientRect();
                 const x = touch.clientX - rect.left;
+                const current = player.currentTime();
                 if (x < rect.width / 3) {
-                    player.currentTime = Math.max(0, player.currentTime - 10);
+                    player.currentTime(Math.max(0, current - 10));
                 } else if (x > rect.width * 2 / 3) {
-                    player.currentTime = Math.min(player.duration, player.currentTime + 10);
+                    const dur = player.duration();
+                    player.currentTime(Math.min(dur, current + 10));
                 }
                 lastTouchTime = 0;
-            } else { lastTouchTime = now; lastTouchX = touch.clientX; }
-        });
-
-        player.on('error', () => {
-            if (errorRetryCount < 3) {
-                errorRetryCount++;
-                setTimeout(() => { videoElement.load(); player.play(); }, 2000);
+            } else {
+                lastTouchTime = now;
+                lastTouchX = touch.clientX;
             }
         });
 
+        // ---- Error recovery ----
+        player.on('error', function() {
+            if (errorRetryCount < 3) {
+                errorRetryCount++;
+                setTimeout(() => {
+                    videoElement.load();
+                    player.play();
+                }, 2000);
+            }
+        });
+
+        // ---- Prevent keyboard shortcuts for saving ----
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) e.preventDefault();
         });
 
+        // ---- Prevent drag ----
         videoElement.addEventListener('dragstart', e => e.preventDefault());
     </script>
 </body>
