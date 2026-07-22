@@ -43,6 +43,20 @@
             border-radius: 12px;
             overflow: hidden;
             cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* Pseudo‑fullscreen fallback */
+        .video-container.pseudo-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            border-radius: 0;
+            z-index: 9999;
+            aspect-ratio: unset;
         }
 
         .video-js {
@@ -181,7 +195,7 @@
             cursor: pointer;
         }
 
-        /* Pills now stay in a single row */
+        /* Pills in one row */
         .pills-container {
             display: flex;
             flex-wrap: nowrap;
@@ -311,14 +325,8 @@
             .center-play svg { width: 26px; }
             .seek-feedback svg { width: 38px; }
             .speed-range { width: 120px; }
-            .pill {
-                width: 38px;
-                height: 32px;
-                font-size: 12px;
-            }
-            .pills-container {
-                gap: 6px;
-            }
+            .pill { width: 38px; height: 32px; font-size: 12px; }
+            .pills-container { gap: 6px; }
         }
     </style>
 </head>
@@ -410,8 +418,10 @@
         const speedRange = document.getElementById('speedRange');
         const bufferSpinner = document.getElementById('bufferSpinner');
         const volIcon = document.getElementById('volIcon');
+        const fullBtn = document.getElementById('fullBtn');
 
         let hideTimer;
+        let isPseudoFullscreen = false;
 
         const player = videojs('player', {
             controls: false,
@@ -470,8 +480,8 @@
         });
         player.on('pause', () => {
             playIcon.innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>';
-            showUI();  // Ensure controls stay visible
-            clearTimeout(hideTimer); // Stop any pending hide
+            showUI();
+            clearTimeout(hideTimer);
         });
 
         centerBtn.addEventListener('click', (e) => {
@@ -486,6 +496,92 @@
             if (duration && isFinite(duration)) {
                 player.currentTime((e.target.value / 100) * duration);
             }
+            resetHideTimer();
+        });
+
+        // ── Fullscreen handling (with pseudo‑fullscreen fallback) ──
+        function isNativeFullscreenActive() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement);
+        }
+
+        function enterFullscreen() {
+            // First try container, then video element
+            const requestFS = (el) => {
+                if (el.requestFullscreen) return el.requestFullscreen();
+                if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+                return Promise.reject('Fullscreen not supported');
+            };
+
+            requestFS(videoContainer)
+                .catch(() => requestFS(videoEl))
+                .catch(() => {
+                    // Native fullscreen failed – use pseudo‑fullscreen
+                    videoContainer.classList.add('pseudo-fullscreen');
+                    isPseudoFullscreen = true;
+                    updateFullscreenIcon();
+                });
+        }
+
+        function exitFullscreen() {
+            if (isPseudoFullscreen) {
+                videoContainer.classList.remove('pseudo-fullscreen');
+                isPseudoFullscreen = false;
+                updateFullscreenIcon();
+                return;
+            }
+            // Exit native fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+
+        function toggleFullscreen() {
+            if (isNativeFullscreenActive() || isPseudoFullscreen) {
+                exitFullscreen();
+            } else {
+                enterFullscreen();
+            }
+        }
+
+        function updateFullscreenIcon() {
+            const svg = fullBtn.querySelector('svg');
+            if (isNativeFullscreenActive() || isPseudoFullscreen) {
+                // Show exit icon
+                svg.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+            } else {
+                // Show enter icon
+                svg.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+            }
+        }
+
+        // Listen for real fullscreen changes to update icon and remove pseudo class
+        function onFullscreenChange() {
+            if (!isNativeFullscreenActive() && isPseudoFullscreen) {
+                // If pseudo was active but native fullscreen was triggered externally, keep pseudo
+            } else if (!isNativeFullscreenActive()) {
+                // Exited native fullscreen – remove pseudo if any
+                if (isPseudoFullscreen) {
+                    videoContainer.classList.remove('pseudo-fullscreen');
+                    isPseudoFullscreen = false;
+                }
+            } else {
+                // Entered native fullscreen – remove pseudo if it was on
+                if (isPseudoFullscreen) {
+                    videoContainer.classList.remove('pseudo-fullscreen');
+                    isPseudoFullscreen = false;
+                }
+            }
+            updateFullscreenIcon();
+        }
+
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+        fullBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFullscreen();
             resetHideTimer();
         });
 
@@ -506,7 +602,6 @@
             if (e.detail === 1) {
                 if (setMenu.classList.contains('active')) return;
                 setTimeout(() => {
-                    // When paused, tapping only shows controls (doesn't hide them)
                     if (player.paused()) {
                         showUI();
                     } else {
@@ -539,7 +634,6 @@
             lastTapSide = isLeft;
             tapTimer = setTimeout(() => {
                 if (setMenu.classList.contains('active')) return;
-                // When paused, only show controls (never hide)
                 if (player.paused()) {
                     showUI();
                 } else {
@@ -598,7 +692,6 @@
 
         function showUI() {
             videoContainer.classList.remove('inactive');
-            // Only restart hide timer if video is playing and menu is closed
             if (!setMenu.classList.contains('active') && !player.paused()) {
                 resetHideTimer();
             }
@@ -709,17 +802,6 @@
             }
         }
 
-        // Fullscreen
-        document.getElementById('fullBtn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                (videoContainer.requestFullscreen || videoContainer.webkitRequestFullscreen).call(videoContainer);
-            } else {
-                (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-            }
-            resetHideTimer();
-        });
-
         // Prevent context menu & long press
         videoEl.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); return false; }, true);
         let pressTimer;
@@ -751,7 +833,7 @@
                     animateSeekFeedback('seekRight');
                     resetHideTimer();
                     break;
-                case 'f': e.preventDefault(); document.getElementById('fullBtn').click(); break;
+                case 'f': e.preventDefault(); toggleFullscreen(); break;
                 case 'm': e.preventDefault(); player.muted(!player.muted()); updateVolumeIcon(); resetHideTimer(); break;
             }
         });
