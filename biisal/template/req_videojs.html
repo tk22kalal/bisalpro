@@ -138,10 +138,8 @@
         }
         .menu-item:hover { background: rgba(255, 255, 255, 0.1); }
 
-        .speed-view,
-        .quality-view { display: none; padding: 8px 15px; }
-        .speed-top-nav,
-        .quality-top-nav { display: flex; align-items: center; height: 30px; }
+        .speed-view { display: none; padding: 8px 15px; }
+        .speed-top-nav { display: flex; align-items: center; height: 30px; }
         .back-btn { background: none; border: none; cursor: pointer; padding: 5px; }
         .speed-display-large {
             color: #fff;
@@ -183,7 +181,14 @@
             cursor: pointer;
         }
 
-        .pills-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: flex-start; }
+        /* Pills now stay in a single row */
+        .pills-container {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 10px;
+            justify-content: center;
+            align-items: flex-start;
+        }
         .pill-wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .pill {
             background: rgba(255, 255, 255, 0.1);
@@ -197,26 +202,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
         .pill:hover { background: rgba(255, 255, 255, 0.2); }
         .pill.active-pill { background: #ff5722; font-weight: 600; }
         .normal-label { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
-
-        .quality-list { display: flex; flex-direction: column; gap: 2px; margin-top: 5px; }
-        .quality-option {
-            padding: 12px 16px;
-            color: #fff;
-            font-size: 14px;
-            cursor: pointer;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .quality-option:hover { background: rgba(255, 255, 255, 0.1); }
-        .quality-option.selected { color: #ff5722; font-weight: 600; }
-        .quality-option .check-mark { display: none; font-size: 16px; }
-        .quality-option.selected .check-mark { display: inline; }
 
         .center-play {
             position: absolute;
@@ -321,7 +311,14 @@
             .center-play svg { width: 26px; }
             .seek-feedback svg { width: 38px; }
             .speed-range { width: 120px; }
-            .pill { width: 42px; height: 32px; font-size: 12px; }
+            .pill {
+                width: 38px;
+                height: 32px;
+                font-size: 12px;
+            }
+            .pills-container {
+                gap: 6px;
+            }
         }
     </style>
 </head>
@@ -349,10 +346,10 @@
             <svg viewBox="0 0 24 24" fill="white" width="28"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         </button>
 
+        <!-- SETTINGS MENU (NO QUALITY) -->
         <div class="settings-menu" id="setMenu">
             <div id="mainMenuView" class="menu-view">
                 <div class="menu-item" id="openSpeed">Speed <span id="currentSpeedLabel">1x</span></div>
-                <div class="menu-item" id="openQuality">Quality <span id="currentQualityLabel">Auto</span><span class="sub-arrow">›</span></div>
                 <div class="menu-item" id="pipOption">Picture-in-Picture</div>
             </div>
             <div id="speedView" class="speed-view">
@@ -365,12 +362,6 @@
                     <button class="pill" data-val="1.5">1.5</button>
                     <button class="pill" data-val="2.0">2.0</button>
                     <button class="pill" data-val="3.0">3.0</button>
-                </div>
-            </div>
-            <div id="qualityView" class="quality-view">
-                <div class="quality-top-nav"><button class="back-btn" id="backToMenuFromQuality"><svg viewBox="0 0 24 24" width="22" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button></div>
-                <div class="quality-list" id="qualityList">
-                    <div class="quality-option selected" data-height="auto">Auto <span class="check-mark">✓</span></div>
                 </div>
             </div>
         </div>
@@ -421,8 +412,6 @@
         const volIcon = document.getElementById('volIcon');
 
         let hideTimer;
-        let selectedQuality = 'auto';
-        let availableHeights = [];
 
         const player = videojs('player', {
             controls: false,
@@ -470,7 +459,6 @@
         player.on('loadedmetadata', () => {
             durEl.textContent = fmt(player.duration());
             updateProgressBar();
-            populateQualityLevels();
         });
 
         player.on('timeupdate', updateTimeDisplay);
@@ -482,7 +470,8 @@
         });
         player.on('pause', () => {
             playIcon.innerHTML = '<path d="M8 5v14l11-7z" fill="black"/>';
-            showUI();
+            showUI();  // Ensure controls stay visible
+            clearTimeout(hideTimer); // Stop any pending hide
         });
 
         centerBtn.addEventListener('click', (e) => {
@@ -500,16 +489,13 @@
             resetHideTimer();
         });
 
-        // ── Interaction: Mouse clicks & Touch taps ──
+        // ── Interaction: Tapping ──
         let lastTapTime = 0;
         let lastTapSide = null;
         let tapTimer = null;
 
-        // Mouse double-click handling (skip single click toggle if menu open)
         videoContainer.addEventListener('click', (e) => {
             if (e.pointerType === 'touch') return;
-            // If settings menu is open, clicking outside will close it via document listener,
-            // so we don't need to toggle controls again.
             if (e.detail === 2) {
                 const rect = videoContainer.getBoundingClientRect();
                 const x = e.clientX - rect.left;
@@ -518,19 +504,22 @@
                 return;
             }
             if (e.detail === 1) {
-                // Do not toggle if menu is open (menu closes by its own logic)
                 if (setMenu.classList.contains('active')) return;
                 setTimeout(() => {
-                    if (videoContainer.classList.contains('inactive')) {
+                    // When paused, tapping only shows controls (doesn't hide them)
+                    if (player.paused()) {
                         showUI();
                     } else {
-                        hideUI();
+                        if (videoContainer.classList.contains('inactive')) {
+                            showUI();
+                        } else {
+                            hideUI();
+                        }
                     }
                 }, 250);
             }
         });
 
-        // Touch handling: double‑tap seeks, single tap toggles controls
         videoContainer.addEventListener('touchstart', (e) => {
             const now = Date.now();
             const rect = videoContainer.getBoundingClientRect();
@@ -549,54 +538,42 @@
             lastTapTime = now;
             lastTapSide = isLeft;
             tapTimer = setTimeout(() => {
-                // Only toggle if menu is not open
                 if (setMenu.classList.contains('active')) return;
-                if (videoContainer.classList.contains('inactive')) {
+                // When paused, only show controls (never hide)
+                if (player.paused()) {
                     showUI();
                 } else {
-                    hideUI();
+                    if (videoContainer.classList.contains('inactive')) {
+                        showUI();
+                    } else {
+                        hideUI();
+                    }
                 }
                 lastTapTime = 0;
                 lastTapSide = null;
             }, 300);
         }, { passive: true });
 
-        // Prevent taps on settings button from reaching container
-        setBtn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-        });
+        setBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); });
         setBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Toggle menu
             const wasActive = setMenu.classList.contains('active');
             if (wasActive) {
                 setMenu.classList.remove('active');
-                // Restart hide timer after closing menu
                 resetHideTimer();
             } else {
                 setMenu.classList.add('active');
-                // Stop hide timer while menu is open
                 clearTimeout(hideTimer);
-                // Ensure UI is visible
                 showUI();
             }
-            // Reset submenus to main when opening
             if (!wasActive) {
                 document.getElementById('mainMenuView').style.display = 'block';
                 document.getElementById('speedView').style.display = 'none';
-                document.getElementById('qualityView').style.display = 'none';
-                populateQualityLevels();
-                updateCurrentQualityLabel();
             }
         });
 
-        // Prevent taps inside the settings menu from toggling controls
-        setMenu.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-        });
-        setMenu.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+        setMenu.addEventListener('touchstart', (e) => { e.stopPropagation(); });
+        setMenu.addEventListener('click', (e) => { e.stopPropagation(); });
 
         function triggerSeek(isLeft) {
             const currentTime = player.currentTime();
@@ -619,25 +596,22 @@
             el.classList.add('animate-seek');
         }
 
-        // ── UI visibility ──
         function showUI() {
             videoContainer.classList.remove('inactive');
-            // Do not restart hide timer if menu is open
-            if (!setMenu.classList.contains('active')) {
+            // Only restart hide timer if video is playing and menu is closed
+            if (!setMenu.classList.contains('active') && !player.paused()) {
                 resetHideTimer();
             }
         }
 
         function hideUI() {
-            // Never hide if settings menu is open
-            if (setMenu.classList.contains('active')) return;
+            if (setMenu.classList.contains('active') || player.paused()) return;
             videoContainer.classList.add('inactive');
             setMenu.classList.remove('active');
         }
 
         function resetHideTimer() {
             clearTimeout(hideTimer);
-            // Only set a new timer if menu is not active and video is playing
             if (!setMenu.classList.contains('active') && !player.paused()) {
                 hideTimer = setTimeout(hideUI, 3500);
             } else if (player.paused()) {
@@ -658,7 +632,6 @@
             if (!player.paused()) hideUI();
         });
 
-        // ── Close menu when clicking outside ──
         document.addEventListener('click', (e) => {
             if (!setMenu.contains(e.target) && e.target !== setBtn) {
                 if (setMenu.classList.contains('active')) {
@@ -673,7 +646,6 @@
             e.stopPropagation();
             document.getElementById('mainMenuView').style.display = 'none';
             document.getElementById('speedView').style.display = 'block';
-            document.getElementById('qualityView').style.display = 'none';
             updateSpeedUI(player.playbackRate());
         });
 
@@ -705,76 +677,6 @@
         document.querySelectorAll('#speedPills .pill').forEach(btn => {
             btn.addEventListener('click', (e) => { e.stopPropagation(); updateSpeed(parseFloat(btn.dataset.val)); });
         });
-
-        // Quality submenu
-        document.getElementById('openQuality').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('mainMenuView').style.display = 'none';
-            document.getElementById('speedView').style.display = 'none';
-            document.getElementById('qualityView').style.display = 'block';
-            populateQualityLevels();
-            updateQualitySelectionUI();
-        });
-
-        document.getElementById('backToMenuFromQuality').addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('mainMenuView').style.display = 'block';
-            document.getElementById('qualityView').style.display = 'none';
-            updateCurrentQualityLabel();
-        });
-
-        function populateQualityLevels() {
-            const levels = player.qualityLevels();
-            const qualityList = document.getElementById('qualityList');
-            const heights = [];
-            try {
-                for (let i = 0; i < levels.length; i++) {
-                    const h = levels[i].height;
-                    if (h && !heights.includes(h)) heights.push(h);
-                }
-            } catch (e) {}
-            heights.sort((a, b) => b - a);
-            availableHeights = heights;
-
-            qualityList.innerHTML = '<div class="quality-option" data-height="auto">Auto <span class="check-mark">✓</span></div>';
-            heights.forEach(h => {
-                const div = document.createElement('div');
-                div.className = 'quality-option';
-                div.dataset.height = h;
-                div.innerHTML = `${h}p <span class="check-mark">✓</span>`;
-                div.addEventListener('click', (e) => { e.stopPropagation(); selectQuality(h); });
-                qualityList.appendChild(div);
-            });
-            const autoOption = qualityList.querySelector('[data-height="auto"]');
-            if (autoOption) autoOption.addEventListener('click', (e) => { e.stopPropagation(); selectQuality('auto'); });
-            updateQualitySelectionUI();
-        }
-
-        function selectQuality(height) {
-            selectedQuality = height;
-            const levels = player.qualityLevels();
-            try {
-                if (height === 'auto') {
-                    for (let i = 0; i < levels.length; i++) levels[i].enabled = true;
-                } else {
-                    for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === height);
-                }
-            } catch (e) {}
-            updateQualitySelectionUI();
-            updateCurrentQualityLabel();
-        }
-
-        function updateQualitySelectionUI() {
-            document.querySelectorAll('#qualityList .quality-option').forEach(opt => {
-                const h = opt.dataset.height;
-                if (h === 'auto') opt.classList.toggle('selected', selectedQuality === 'auto');
-                else opt.classList.toggle('selected', selectedQuality === parseInt(h));
-            });
-        }
-
-        function updateCurrentQualityLabel() {
-            document.getElementById('currentQualityLabel').textContent = selectedQuality === 'auto' ? 'Auto' : selectedQuality + 'p';
-        }
 
         // PiP
         document.getElementById('pipOption').addEventListener('click', (e) => {
@@ -861,7 +763,6 @@
             durEl.textContent = fmt(player.duration() || 0);
             showUI();
             resetHideTimer();
-            setTimeout(populateQualityLevels, 1500);
         });
     })();
     </script>
