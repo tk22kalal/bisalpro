@@ -418,8 +418,6 @@
         const playIcon = document.getElementById('playIcon');
         const speedRange = document.getElementById('speedRange');
         const bufferSpinner = document.getElementById('bufferSpinner');
-        const seekLeft = document.getElementById('seekLeft');
-        const seekRight = document.getElementById('seekRight');
         const volIcon = document.getElementById('volIcon');
 
         let hideTimer;
@@ -507,10 +505,11 @@
         let lastTapSide = null;
         let tapTimer = null;
 
-        // Mouse double-click handling
+        // Mouse double-click handling (skip single click toggle if menu open)
         videoContainer.addEventListener('click', (e) => {
-            // Ignore if a touch event already handled the single tap (avoid double toggle)
             if (e.pointerType === 'touch') return;
+            // If settings menu is open, clicking outside will close it via document listener,
+            // so we don't need to toggle controls again.
             if (e.detail === 2) {
                 const rect = videoContainer.getBoundingClientRect();
                 const x = e.clientX - rect.left;
@@ -519,7 +518,8 @@
                 return;
             }
             if (e.detail === 1) {
-                // Single click toggles controls (with a tiny delay to differentiate from double)
+                // Do not toggle if menu is open (menu closes by its own logic)
+                if (setMenu.classList.contains('active')) return;
                 setTimeout(() => {
                     if (videoContainer.classList.contains('inactive')) {
                         showUI();
@@ -537,7 +537,6 @@
             const x = e.touches[0].clientX - rect.left;
             const isLeft = x < rect.width / 2;
 
-            // Double tap detection
             if (now - lastTapTime < 300 && isLeft === lastTapSide && lastTapSide !== null) {
                 clearTimeout(tapTimer);
                 triggerSeek(isLeft);
@@ -546,12 +545,12 @@
                 return;
             }
 
-            // Start a timer for a potential single tap
             clearTimeout(tapTimer);
             lastTapTime = now;
             lastTapSide = isLeft;
             tapTimer = setTimeout(() => {
-                // If no second tap happened, toggle controls
+                // Only toggle if menu is not open
+                if (setMenu.classList.contains('active')) return;
                 if (videoContainer.classList.contains('inactive')) {
                     showUI();
                 } else {
@@ -561,6 +560,43 @@
                 lastTapSide = null;
             }, 300);
         }, { passive: true });
+
+        // Prevent taps on settings button from reaching container
+        setBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+        setBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Toggle menu
+            const wasActive = setMenu.classList.contains('active');
+            if (wasActive) {
+                setMenu.classList.remove('active');
+                // Restart hide timer after closing menu
+                resetHideTimer();
+            } else {
+                setMenu.classList.add('active');
+                // Stop hide timer while menu is open
+                clearTimeout(hideTimer);
+                // Ensure UI is visible
+                showUI();
+            }
+            // Reset submenus to main when opening
+            if (!wasActive) {
+                document.getElementById('mainMenuView').style.display = 'block';
+                document.getElementById('speedView').style.display = 'none';
+                document.getElementById('qualityView').style.display = 'none';
+                populateQualityLevels();
+                updateCurrentQualityLabel();
+            }
+        });
+
+        // Prevent taps inside the settings menu from toggling controls
+        setMenu.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+        setMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
 
         function triggerSeek(isLeft) {
             const currentTime = player.currentTime();
@@ -586,24 +622,31 @@
         // ── UI visibility ──
         function showUI() {
             videoContainer.classList.remove('inactive');
-            resetHideTimer();
+            // Do not restart hide timer if menu is open
+            if (!setMenu.classList.contains('active')) {
+                resetHideTimer();
+            }
         }
 
         function hideUI() {
+            // Never hide if settings menu is open
+            if (setMenu.classList.contains('active')) return;
             videoContainer.classList.add('inactive');
             setMenu.classList.remove('active');
         }
 
         function resetHideTimer() {
             clearTimeout(hideTimer);
-            if (!player.paused()) {
+            // Only set a new timer if menu is not active and video is playing
+            if (!setMenu.classList.contains('active') && !player.paused()) {
                 hideTimer = setTimeout(hideUI, 3500);
-            } else {
+            } else if (player.paused()) {
                 showUI();
             }
         }
 
         videoContainer.addEventListener('mousemove', () => {
+            if (setMenu.classList.contains('active')) return;
             if (videoContainer.classList.contains('inactive') && !player.paused()) {
                 showUI();
             } else {
@@ -611,26 +654,17 @@
             }
         });
         videoContainer.addEventListener('mouseleave', () => {
+            if (setMenu.classList.contains('active')) return;
             if (!player.paused()) hideUI();
         });
 
-        // ── Settings menu ──
-        setBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setMenu.classList.toggle('active');
-            if (setMenu.classList.contains('active')) {
-                document.getElementById('mainMenuView').style.display = 'block';
-                document.getElementById('speedView').style.display = 'none';
-                document.getElementById('qualityView').style.display = 'none';
-                populateQualityLevels();
-                updateCurrentQualityLabel();
-            }
-            resetHideTimer();
-        });
-
+        // ── Close menu when clicking outside ──
         document.addEventListener('click', (e) => {
             if (!setMenu.contains(e.target) && e.target !== setBtn) {
-                setMenu.classList.remove('active');
+                if (setMenu.classList.contains('active')) {
+                    setMenu.classList.remove('active');
+                    resetHideTimer();
+                }
             }
         });
 
