@@ -7,103 +7,78 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway|Delius">
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
-        /* MINIMALIST CSS FOR SPEED */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; font-family: 'Raleway', sans-serif; overflow: hidden; -webkit-touch-callout: none; user-select: none; }
-        
-        marquee { 
-            font-size: 15px; font-weight: 600; color: #fff; background: #000; 
-            padding: 8px; font-family: 'Delius', serif; width: 100%; border-bottom: 1px solid #222; 
+        body { 
+            background: #000; 
+            font-family: 'Raleway', sans-serif; 
+            overflow-x: hidden; 
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none;
+            user-select: none;
         }
-
+        marquee { font-size: 18px; font-weight: 600; color: #fff; background: rgba(0,0,0,0.9); padding: 10px; font-family: 'Delius', serif; width: 100%; }
         .container { width: 100%; background: #000; position: relative; }
         .video-js { width: 100% !important; height: auto !important; aspect-ratio: 16 / 9; }
         
-        /* Fast-tap Seek Indicators */
-        .tap-indicator { 
-            position: absolute; top: 50%; transform: translateY(-50%); 
-            font-size: 35px; color: #fff; pointer-events: none; z-index: 10; 
-            animation: tapFade 0.4s ease-out forwards; text-shadow: 0 0 8px #000; 
-        }
-        .tap-indicator.left { left: 15%; }
-        .tap-indicator.right { right: 15%; }
-        @keyframes tapFade { 
-            0% { opacity: 0; transform: translateY(-50%) scale(0.5); } 
-            50% { opacity: 1; } 
-            100% { opacity: 0; transform: translateY(-50%) scale(1.2); } 
-        }
+        /* HIDE NATIVE DOWNLOAD CONTROLS */
+        video::-webkit-media-controls-download-button { display: none !important; }
+        video::-webkit-media-controls-enclosure { overflow: hidden !important; }
 
-        /* UI Enhancements */
-        .vjs-big-play-button { 
-            border-radius: 50% !important; width: 2.2em !important; height: 2.2em !important; 
-            line-height: 2.2em !important; left: 50% !important; top: 50% !important; 
-            margin: -1.1em 0 0 -1.1em !important; border: none !important; 
-            background: rgba(255,255,255,0.15) !important; backdrop-filter: blur(8px); 
+        .vjs-tech { object-fit: contain; }
+        .tap-indicator { position: absolute; top: 50%; transform: translateY(-50%); font-size: 60px; color: rgba(255,255,255,0.95); pointer-events: none; z-index: 10000; animation: tapFade 0.5s ease-out forwards; }
+        .tap-indicator.left  { left: 50px; }
+        .tap-indicator.right { right: 50px; }
+        @keyframes tapFade { 0% { opacity: 1; transform: translateY(-50%) scale(0.8); } 50% { transform: translateY(-50%) scale(1.2); } 100% { opacity: 0; transform: translateY(-50%) scale(0.8); } }
+        .vjs-control-bar { background: linear-gradient(transparent, rgba(0,0,0,0.85)) !important; }
+        .vjs-big-play-button { border-radius: 50% !important; width: 2em !important; height: 2em !important; line-height: 2em !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
+        .vjs-quality-button .vjs-icon-placeholder::before { content: 'HD'; font-size: 1.5em; line-height: 1.67; }
+
+        @media (max-width: 768px) { 
+            marquee { font-size: 14px; } 
+            .tap-indicator { font-size: 48px; }
         }
-        .vjs-quality-button .vjs-icon-placeholder::before { content: 'HD'; font-size: 1.4em; line-height: 1.8; }
-        
-        /* Hide unwanted elements to keep it clean */
-        .vjs-error-display { background: #000; }
     </style>
 </head>
 <body>
-    <header><marquee>{{ file_name }}</marquee></header>
+    <header><marquee><div id="file-name">{{ file_name }}</div></marquee></header>
 
     <div class="container">
-        <!-- Poster removed for faster loading -->
         <video id="player" 
             class="video-js vjs-default-skin vjs-big-play-centered" 
             controls 
-            preload="auto" 
+            preload="metadata" 
             playsinline 
-            crossorigin="anonymous">
+            controlsList="nodownload" 
+            oncontextmenu="return false;"
+            crossorigin="anonymous"
             <source src="{{ file_url }}" type="application/x-mpegURL">
         </video>
     </div>
 
-    <!-- Video.js and Quality Plugin -->
     <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-quality-levels@4.1.0/dist/videojs-contrib-quality-levels.min.js"></script>
 
     <script>
     (function() {
-        const player = videojs('player', {
-            fluid: true,
-            playbackRates: [0.5, 1, 1.25, 1.5, 2],
-            controlBar: {
-                // Removed subtitles button since tracks are removed
-                children: ['playToggle', 'progressControl', 'volumePanel', 'qualityButton', 'playbackRateMenuButton', 'fullscreenToggle']
-            },
-            html5: {
-                vhs: {
-                    overrideNative: true,         // Vital for "Auto" quality ABR to work properly
-                    enableLowInitialPlaylist: true, // Starts video faster on slow networks
-                    fastQualityChange: true,      // Switches resolution instantly if net speed changes
-                    experimentalBufferBasedABR: true
-                }
-            }
-        });
+        'use strict';
+        const playerElement = document.getElementById('player');
+        const container = document.querySelector('.container');
+        const isVideo = playerElement.tagName.toLowerCase() === 'video';
+        let lastTapTime = 0, lastTapSide = null;
 
-        // --- AUTOMATIC & MANUAL QUALITY LOGIC ---
+        // Custom Quality Button Logic
         const QualityButton = videojs.extend(videojs.getComponent('MenuButton'), {
             constructor: function(p, o) {
                 videojs.getComponent('MenuButton').call(this, p, o);
                 this.addClass('vjs-quality-button');
+                this.controlText('Quality');
             },
             createItems: function() {
                 const items = [];
                 const levels = this.player().qualityLevels();
+                if (!levels) return items;
                 const MenuItem = videojs.getComponent('MenuItem');
-
-                // 1. Auto Quality Item (Uses all available bandwidth)
-                const autoItem = new MenuItem(this.player(), { label: 'Auto', selectable: true, selected: true });
-                autoItem.on('click', () => {
-                    for (let i = 0; i < levels.length; i++) levels[i].enabled = true;
-                    autoItem.selected(true);
-                });
-                items.push(autoItem);
-
-                // 2. Manual Resolution Items
+                items.push(new MenuItem(this.player(), { label: 'Auto', selected: true, selectable: true }));
                 const heights = [];
                 for (let i = 0; i < levels.length; i++) {
                     if (levels[i].height && !heights.includes(levels[i].height)) heights.push(levels[i].height);
@@ -111,9 +86,7 @@
                 heights.sort((a, b) => b - a).forEach(h => {
                     const item = new MenuItem(this.player(), { label: h + 'p', selectable: true });
                     item.on('click', () => {
-                        for (let i = 0; i < levels.length; i++) {
-                            levels[i].enabled = (levels[i].height === h);
-                        }
+                        for (let i = 0; i < levels.length; i++) levels[i].enabled = (levels[i].height === h);
                     });
                     items.push(item);
                 });
@@ -122,46 +95,61 @@
         });
         videojs.registerComponent('QualityButton', QualityButton);
 
-        // --- DOUBLE TAP TO SEEK (10s) ---
-        let lastTapTime = 0;
-        const container = document.querySelector('.container');
+        const player = videojs('player', {
+            playbackRates: [0.5, 1, 1.5, 2],
+            nativeControlsForTouch: false,
+            controlBar: {
+                children: ['playToggle', 'progressControl', 'volumePanel', 'qualityButton', 'playbackRateMenuButton', 'fullscreenToggle']
+            },
+            html5: { 
+                vhs: {
+                    overrideNative: true,               // always use HLS.js for consistent behaviour
+                    enableLowInitialPlaylist: true,      // start with low bitrate for fast startup
+                    fastQualityChange: true,            // optimise quality switches
+                    useBandwidthFromLocalStorage: true  // remember bandwidth across sessions
+                } 
+        });
 
-        const handleDoubleTap = (e) => {
+        // ─────────────────────────────────────────
+        // PLAYER CONTROLS & INTERACTIONS
+        // ─────────────────────────────────────────
+        
+        // DISABLE LONG PRESS & CONTEXT MENU
+        playerElement.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, true);
+        
+        let pressTimer;
+        playerElement.addEventListener('touchstart', e => {
+            pressTimer = setTimeout(() => { e.preventDefault(); }, 500);
+        }, { passive: false });
+
+        playerElement.addEventListener('touchend',  () => clearTimeout(pressTimer));
+        playerElement.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+        // DOUBLE TAP TO SEEK (10s)
+        function handleTap(e) {
+            if (!isVideo) return;
             const now = Date.now();
-            const rect = container.getBoundingClientRect();
-            // Works for both touch and mouse
-            const clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
-            const touchX = clientX - rect.left;
-            const side = touchX < rect.width / 2 ? 'left' : 'right';
-
-            if (now - lastTapTime < 300) {
-                if (side === 'left') {
-                    player.currentTime(Math.max(0, player.currentTime() - 10));
-                    showIndicator('left', '⏪ 10s');
-                } else {
-                    player.currentTime(Math.min(player.duration(), player.currentTime() + 10));
-                    showIndicator('right', '10s ⏩');
-                }
+            const rect = playerElement.getBoundingClientRect();
+            const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+            const isLeft = x < rect.width / 2;
+            if (now - lastTapTime < 300 && isLeft === lastTapSide) {
+                if (isLeft) { player.currentTime(Math.max(0, player.currentTime() - 10)); showIndicator('left', '⏪ 10s'); }
+                else { player.currentTime(Math.min(player.duration(), player.currentTime() + 10)); showIndicator('right', '10s ⏩'); }
             }
-            lastTapTime = now;
-        };
+            lastTapTime = now; lastTapSide = isLeft;
+        }
 
         function showIndicator(side, text) {
             const el = document.createElement('div');
             el.className = `tap-indicator ${side}`;
-            el.innerText = text;
+            el.innerHTML = text;
             container.appendChild(el);
-            setTimeout(() => el.remove(), 400);
+            setTimeout(() => el.remove(), 500);
         }
 
         player.ready(() => {
-            const tech = player.el().querySelector('.vjs-tech');
-            // Fast seek on mobile and desktop
-            tech.addEventListener('touchend', handleDoubleTap);
-            tech.addEventListener('dblclick', handleDoubleTap);
-            
-            // Clean interface: Prevent context menu
-            player.on('contextmenu', e => e.preventDefault());
+            playerElement.addEventListener('touchstart', handleTap, { passive: true });
+            playerElement.addEventListener('click', handleTap);
         });
     })();
     </script>
